@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma";
 import {
   PrepaidTxType,
@@ -10,10 +11,12 @@ import {
 } from "../app/generated/prisma/client";
 
 // 開発・デモ用のシードデータです。実在の患者情報は含みません(すべて架空の人物)。
+// ログイン用パスワードは全員共通の "hagukuma-demo" です。本番投入前に必ず変更してください。
 
 const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY);
 const daysFromNow = (n: number) => new Date(Date.now() + n * DAY);
+const DEMO_PASSWORD_HASH = bcrypt.hashSync("hagukuma-demo", 10);
 
 async function main() {
   console.log("seeding...");
@@ -35,11 +38,22 @@ async function main() {
 
   // --- スタッフ -----------------------------------------------------------
   const director = await prisma.staff.create({
-    data: { name: "高橋 院長", role: StaffRole.DIRECTOR },
+    data: {
+      name: "高橋 院長",
+      role: StaffRole.DIRECTOR,
+      username: "inchou",
+      passwordHash: DEMO_PASSWORD_HASH,
+    },
   });
-  const staffSato = await prisma.staff.create({ data: { name: "佐藤" } });
-  const staffSuzuki = await prisma.staff.create({ data: { name: "鈴木" } });
-  const staffTanaka = await prisma.staff.create({ data: { name: "田中" } });
+  const staffSato = await prisma.staff.create({
+    data: { name: "佐藤", username: "sato", passwordHash: DEMO_PASSWORD_HASH },
+  });
+  const staffSuzuki = await prisma.staff.create({
+    data: { name: "鈴木", username: "suzuki", passwordHash: DEMO_PASSWORD_HASH },
+  });
+  const staffTanaka = await prisma.staff.create({
+    data: { name: "田中", username: "tanaka", passwordHash: DEMO_PASSWORD_HASH },
+  });
 
   // --- 来店経路 -------------------------------------------------------------
   const channelNames = [

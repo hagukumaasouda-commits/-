@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { auth } from "@/auth";
+import { logout } from "@/app/actions/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,7 +9,9 @@ export const metadata: Metadata = {
   description: "顧客管理・電子カルテ・気づきチェック・自動集計",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+
   return (
     <html lang="ja" className="h-full">
       <body className="min-h-full flex flex-col bg-stone-50 text-stone-900">
@@ -16,17 +20,30 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/dashboard" className="font-semibold tracking-tight text-emerald-800">
               はぐくま CRM
             </Link>
-            <nav className="flex gap-4 text-sm text-stone-600">
-              <Link href="/dashboard" className="hover:text-emerald-800">
-                ダッシュボード
-              </Link>
-              <Link href="/clients" className="hover:text-emerald-800">
-                顧客一覧
-              </Link>
-              <Link href="/clients/new" className="hover:text-emerald-800">
-                新規顧客登録
-              </Link>
-            </nav>
+            {session?.user && (
+              <>
+                <nav className="flex gap-4 text-sm text-stone-600">
+                  <Link href="/dashboard" className="hover:text-emerald-800">
+                    ダッシュボード
+                  </Link>
+                  <Link href="/clients" className="hover:text-emerald-800">
+                    顧客一覧
+                  </Link>
+                  <Link href="/clients/new" className="hover:text-emerald-800">
+                    新規顧客登録
+                  </Link>
+                  <Link href="/reminders" className="hover:text-emerald-800">
+                    予約リマインド
+                  </Link>
+                </nav>
+                <div className="ml-auto flex items-center gap-3 text-sm text-stone-500">
+                  <span>{session.user.name} さん</span>
+                  <form action={logout}>
+                    <button className="text-stone-400 hover:text-stone-700 underline">ログアウト</button>
+                  </form>
+                </div>
+              </>
+            )}
           </div>
         </header>
         <main className="flex-1">

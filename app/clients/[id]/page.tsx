@@ -40,8 +40,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   });
   if (!client) notFound();
 
-  const allStaff = await prisma.staff.findMany({ where: { active: true }, orderBy: { name: "asc" } });
-
   const balance = client.prepaidCard
     ? client.prepaidCard.transactions.reduce((s, t) => s + t.amount, 0)
     : null;
@@ -148,18 +146,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <AwarenessLane
-          title="事務チェック(記入漏れ)"
-          tone="office"
-          checks={officeChecks}
-          staff={allStaff}
-        />
-        <AwarenessLane
-          title="AI気づき(関わりの質・離脱兆候)"
-          tone="ai"
-          checks={aiChecks}
-          staff={allStaff}
-        />
+        <AwarenessLane title="事務チェック(記入漏れ)" tone="office" checks={officeChecks} />
+        <AwarenessLane title="AI気づき(関わりの質・離脱兆候)" tone="ai" checks={aiChecks} />
       </div>
 
       <section className="rounded-lg border border-stone-200 bg-white p-5">
@@ -219,12 +207,10 @@ function AwarenessLane({
   title,
   tone,
   checks,
-  staff,
 }: {
   title: string;
   tone: "office" | "ai";
   checks: CheckWithVisit[];
-  staff: { id: string; name: string }[];
 }) {
   return (
     <section className={`rounded-lg border p-5 ${tone === "ai" ? "border-amber-200 bg-amber-50/40" : "border-stone-200 bg-white"}`}>
@@ -252,14 +238,6 @@ function AwarenessLane({
 
             <form action={submitDialogue} className="mt-2 flex items-center gap-2">
               <input type="hidden" name="awarenessCheckId" value={c.id} />
-              <select name="authorStaffId" className="input py-1 text-xs" required>
-                <option value="">発言者</option>
-                {staff.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
               <input name="comment" placeholder="コメントする" className="input flex-1 py-1 text-xs" />
               <button className="rounded-md bg-stone-800 px-2.5 py-1 text-xs text-white">送信</button>
             </form>

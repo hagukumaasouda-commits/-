@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { saveOfficeCheck } from "@/lib/awareness/office";
 import { saveAiInsights } from "@/lib/awareness/ai-insight";
 import { CheckStatus } from "@/app/generated/prisma/client";
+import { auth } from "@/auth";
 
 // 「気づきチェック」ボタンから呼ばれるサーバーアクション。
 // 事務チェック(ルールベース)とAI気づき(生成AI)を両方走らせ、
@@ -21,10 +22,13 @@ export async function runAwarenessCheck(visitId: string): Promise<void> {
 }
 
 export async function submitDialogue(formData: FormData) {
+  const session = await auth();
+  const authorStaffId = session?.user?.id;
+  if (!authorStaffId) return;
+
   const awarenessCheckId = String(formData.get("awarenessCheckId") || "");
-  const authorStaffId = String(formData.get("authorStaffId") || "");
   const comment = String(formData.get("comment") || "");
-  if (!awarenessCheckId || !authorStaffId) return;
+  if (!awarenessCheckId) return;
   await postDialogue(awarenessCheckId, authorStaffId, comment);
 }
 

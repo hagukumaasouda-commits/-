@@ -16,11 +16,13 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model Staff {
-  id        String   @id @default(cuid())
-  name      String
-  role      StaffRole @default(STAFF)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  username     String?  @unique
+  passwordHash String?
+  role         StaffRole @default(STAFF)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
 
   primaryClients      Client[]            @relation("PrimaryStaff")
   clientAssignments   ClientStaff[]
@@ -55,6 +57,7 @@ model Client {
   address   String?
   occupation String?
   lifestyleTags Json? // 睡眠時間・飲水量・食事内容などの初回フォーム項目
+  lineUserId String? @unique // LINE公式アカウントの友だち追加で取得するID(リマインド送信先)
 
   acquisitionChannelId String?
   acquisitionChannel   AcquisitionChannel? @relation(fields: [acquisitionChannelId], references: [id])
