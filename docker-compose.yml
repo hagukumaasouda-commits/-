@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hagukuma
+      POSTGRES_PASSWORD: hagukuma
+      POSTGRES_DB: hagukuma_crm
+    ports:
+      - "5432:5432"
+    volumes:
+      - hagukuma_db_data:/var/lib/postgresql/data
+
+volumes:
+  hagukuma_db_data:

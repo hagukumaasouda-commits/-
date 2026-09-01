@@ -1,0 +1,38 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "はぐくまCRM",
+  description: "顧客管理・電子カルテ・気づきチェック・自動集計",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="ja" className="h-full">
+      <body className="min-h-full flex flex-col bg-stone-50 text-stone-900">
+        <header className="border-b border-stone-200 bg-white">
+          <div className="mx-auto max-w-6xl px-6 py-3 flex items-center gap-6">
+            <Link href="/dashboard" className="font-semibold tracking-tight text-emerald-800">
+              はぐくま CRM
+            </Link>
+            <nav className="flex gap-4 text-sm text-stone-600">
+              <Link href="/dashboard" className="hover:text-emerald-800">
+                ダッシュボード
+              </Link>
+              <Link href="/clients" className="hover:text-emerald-800">
+                顧客一覧
+              </Link>
+              <Link href="/clients/new" className="hover:text-emerald-800">
+                新規顧客登録
+              </Link>
+            </nav>
+          </div>
+        </header>
+        <main className="flex-1">
+          <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
+        </main>
+      </body>
+    </html>
+  );
+}

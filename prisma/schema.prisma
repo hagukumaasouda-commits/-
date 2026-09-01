@@ -1,0 +1,314 @@
+// はぐくま CRM・電子カルテ統合 データモデル
+// 設計方針: 来院(Visit)を起点に カルテ / プリカ / 予約 / 気づき が client にぶら下がる。
+// カルテの可変項目は JSON で柔軟に持ち、集計・チェックに使う項目だけ実カラム/タグ配列に切り出す。
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// マスタ
+// ---------------------------------------------------------------------------
+
+model Staff {
+  id        String   @id @default(cuid())
+  name      String
+  role      StaffRole @default(STAFF)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  primaryClients      Client[]            @relation("PrimaryStaff")
+  clientAssignments   ClientStaff[]
+  visits              Visit[]
+  staffMindsetChecks  StaffMindsetCheck[]
+  awarenessDialogues  AwarenessDialogue[]
+}
+
+enum StaffRole {
+  STAFF
+  DIRECTOR // 院長
+}
+
+model AcquisitionChannel {
+  id      String   @id @default(cuid())
+  name    String   @unique // 院の看板 / ホットペッパービューティー / ホームページ / インスタグラム・SNS / ご紹介 / その他
+  clients Client[]
+}
+
+// ---------------------------------------------------------------------------
+// 顧客
+// ---------------------------------------------------------------------------
+
+model Client {
+  id        String    @id @default(cuid())
+  name      String
+  kana      String?
+  dob       DateTime?
+  gender    String?
+  phone     String?
+  postalCode String?
+  address   String?
+  occupation String?
+  lifestyleTags Json? // 睡眠時間・飲水量・食事内容などの初回フォーム項目
+
+  acquisitionChannelId String?
+  acquisitionChannel   AcquisitionChannel? @relation(fields: [acquisitionChannelId], references: [id])
+
+  referredById String?
+  referredBy   Client?  @relation("Referral", fields: [referredById], references: [id])
+  referrals    Client[] @relation("Referral")
+
+  primaryStaffId String?
+  primaryStaff   Staff?  @relation("PrimaryStaff", fields: [primaryStaffId], references: [id])
+  staffAssignments ClientStaff[]
+
+  firstVisitDate DateTime?
+  isActive       Boolean   @default(true) // 離脱バッチが更新するフラグ
+  createdAt      DateTime  @default(now())
+
+  visits            Visit[]
+  treatmentCourses  TreatmentCourse[]
+  prepaidCard       PrepaidCard?
+  reservations      Reservation[]
+  statusSnapshots   ClientStatusSnapshot[]
+
+  @@index([acquisitionChannelId])
+  @@index([primaryStaffId])
+  @@index([firstVisitDate])
+}
+
+// 複数担当(祥平, 由衣 など)を許容するための中間テーブル。primaryStaffId は代表担当。
+model ClientStaff {
+  clientId String
+  staffId  String
+  client   Client @relation(fields: [clientId], references: [id])
+  staff    Staff  @relation(fields: [staffId], references: [id])
+
+  @@id([clientId, staffId])
+}
+
+// ---------------------------------------------------------------------------
+// 来院・カルテ
+// ---------------------------------------------------------------------------
+
+model Visit {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id])
+  staffId   String
+  staff     Staff    @relation(fields: [staffId], references: [id])
+  courseId  String?
+  course    TreatmentCourse? @relation(fields: [courseId], references: [id])
+
+  visitDate DateTime
+  visitNo   Int      // その顧客にとって何回目の来院か(作成時に算出)
+  menu      String?
+
+  createdAt DateTime @default(now())
+
+  chartRecord      ChartRecord?
+  awarenessChecks  AwarenessCheck[]
+  mindsetChecks    StaffMindsetCheck[]
+  prepaidTxns      PrepaidTransaction[]
+
+  @@index([clientId, visitDate])
+  @@unique([clientId, visitNo])
+}
+
+model ChartRecord {
+  id      String @id @default(cuid())
+  visitId String @unique
+  visit   Visit  @relation(fields: [visitId], references: [id])
+
+  chiefComplaintTags String[] // 肩こり / 腰痛 / 自律神経症状 など(来院理由分布に使用)
+  bodyPartTags       String[] // 頭蓋 / 内臓 / 上肢 / 下肢 / 脊椎 / 体幹(施術部位分布に使用)
+
+  exam              Json?   // 可動域・脊椎状態・重心軸などの検査値
+  treatmentDetail   Json?   // 部位×体位×コメントの施術詳細
+
+  evaluation        String? // 何が起きているか
+  changeFromLast    String? // 前回からの変化
+  reevaluation      String? // 何が変わったか(再評価)
+  meaningConveyed   String? // 患者さんへどう伝えたか
+  clientVoice       String? // お客様の声(自己認識)
+  nextCheck         String? // 次回確認
+  nextRequired      String? // 次回必須
+
+  requiredFields    Json?   // 必須項目チェックリストの状態(未/完) -> 事務チェックが参照
+
+  createdAt         DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// プラン・プリカ
+// ---------------------------------------------------------------------------
+
+model TreatmentCourse {
+  id       String  @id @default(cuid())
+  clientId String
+  client   Client  @relation(fields: [clientId], references: [id])
+
+  courseNo         Int     // 1クール, 2クール ...
+  planType         String  // 都度 / プ1万 / プ2万 / プ3万 / 会員 / お試し / 自賠 等
+  plannedSessions  Int?
+  durationProposal Json?   // 1.5ヶ月40% / 2ヶ月55% / 3ヶ月50% などの継続提案
+  goal             String? // 解決したいこと(顕在・深層ニーズ)
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  visits Visit[]
+}
+
+model PrepaidCard {
+  id       String @id @default(cuid())
+  clientId String @unique
+  client   Client @relation(fields: [clientId], references: [id])
+
+  planType  String?
+  openedAt  DateTime @default(now())
+  closedAt  DateTime?
+
+  transactions PrepaidTransaction[]
+}
+
+model PrepaidTransaction {
+  id     String @id @default(cuid())
+  cardId String
+  card   PrepaidCard @relation(fields: [cardId], references: [id])
+
+  txType      PrepaidTxType
+  amount      Int      // charge は正, use は負で記録
+  balanceAfter Int?    // 計算結果のスナップショット(表示高速化用。真実はSUMで再計算可能)
+  txDate      DateTime @default(now())
+
+  visitId String?
+  visit   Visit?  @relation(fields: [visitId], references: [id])
+
+  note String?
+
+  @@index([cardId, txDate])
+}
+
+enum PrepaidTxType {
+  CHARGE
+  USE
+  ADJUST
+}
+
+// ---------------------------------------------------------------------------
+// 予約
+// ---------------------------------------------------------------------------
+
+model Reservation {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  source        ReservationSource @default(MANUAL)
+  reservedAt    DateTime
+  status        ReservationStatus @default(CONFIRMED)
+  reminderSentAt DateTime?
+  syncedAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([clientId, reservedAt])
+}
+
+enum ReservationSource {
+  HOTPEPPER
+  LINE
+  PHONE
+  MANUAL
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  CANCELLED
+  CHANGED
+  COMPLETED
+}
+
+// ---------------------------------------------------------------------------
+// 気づきチェック(事務チェック / AI気づき)と対話ログ
+// ---------------------------------------------------------------------------
+
+model AwarenessCheck {
+  id      String @id @default(cuid())
+  visitId String
+  visit   Visit  @relation(fields: [visitId], references: [id])
+
+  checkType CheckType // OFFICE(ルールベース記入漏れ) / AI_INSIGHT(関わりの質・離脱兆候)
+  category  String    // 記入漏れ / 頻度と関わりのギャップ / 来店間隔の変化 / 残高消化と来店の乖離 / 施術内容の変化 等
+  message   String    // AIや事務チェックが提示する気づき文(断定ではなく問いかけ調)
+  severity  Severity  @default(INFO)
+  status    CheckStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+
+  dialogue AwarenessDialogue[]
+
+  @@index([visitId])
+  @@index([status])
+}
+
+enum CheckType {
+  OFFICE
+  AI_INSIGHT
+}
+
+enum Severity {
+  INFO
+  NOTICE
+  IMPORTANT
+}
+
+enum CheckStatus {
+  OPEN
+  DISCUSSED
+  RESOLVED
+}
+
+model AwarenessDialogue {
+  id               String   @id @default(cuid())
+  awarenessCheckId String
+  awarenessCheck   AwarenessCheck @relation(fields: [awarenessCheckId], references: [id])
+  authorStaffId    String
+  authorStaff      Staff    @relation(fields: [authorStaffId], references: [id])
+  comment          String
+  createdAt        DateTime @default(now())
+}
+
+// 継続カルテ由来: 施術者マインド・フロントトークの自己点検(監視ではなく振り返り用途)
+model StaffMindsetCheck {
+  id      String @id @default(cuid())
+  visitId String
+  visit   Visit  @relation(fields: [visitId], references: [id])
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id])
+
+  selfCheck Json // { totonoeru: bool, imakoko: bool, hyoukakyoufuNashi: bool, haraOKukuru: bool }
+  note      String?
+
+  createdAt DateTime @default(now())
+}
+
+// 週次/月次の顧客状態スナップショット(ランク・健康度幸福度などの時系列保持)
+model ClientStatusSnapshot {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  snapshotDate DateTime
+  rank         String? // AS / A / B / C1 / C2 / C3
+  healthScore  Int?    // 健康度幸福度(%)
+  statusLabel  String? // 継続 / 参加 / 納得 / 理解 / 自己決定 / 安心 / 希望 / 不安 等
+
+  @@index([clientId, snapshotDate])
+}
