@@ -1,0 +1,80 @@
+"use client";
+
+import { useActionState } from "react";
+import { importSalonBoardCsv, type ImportSummary } from "@/app/actions/reservations-import";
+
+export default function ImportForm() {
+  const [state, formAction, isPending] = useActionState<ImportSummary | undefined, FormData>(
+    importSalonBoardCsv,
+    undefined
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <form action={formAction} className="flex items-center gap-3">
+        <input type="file" name="file" accept=".csv,text/csv" required className="text-sm" />
+        <button
+          type="submit"
+          disabled={isPending}
+          className="rounded-md bg-emerald-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+        >
+          {isPending ? "取り込み中…" : "取り込む"}
+        </button>
+      </form>
+
+      {state && !state.ok && (
+        <div className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800">{state.formatError}</div>
+      )}
+
+      {state && state.ok && (
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label="対象行数" value={state.totalDataRows} />
+            <Stat label="新規顧客" value={state.clientsCreated} />
+            <Stat label="既存顧客に一致" value={state.clientsMatched} />
+            <Stat label="予約 新規/更新" value={`${state.reservationsCreated} / ${state.reservationsUpdated}`} />
+          </div>
+
+          {state.skipped.length > 0 && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+              <p className="font-medium text-amber-900 mb-2">スキップした行({state.skipped.length}件)</p>
+              <ul className="flex flex-col gap-1 text-xs text-amber-800 max-h-48 overflow-y-auto">
+                {state.skipped.map((s, i) => (
+                  <li key={i}>
+                    {s.line}行目: {s.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {state.dbErrors.length > 0 && (
+            <div className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm">
+              <p className="font-medium text-rose-900 mb-2">保存に失敗した行({state.dbErrors.length}件)</p>
+              <ul className="flex flex-col gap-1 text-xs text-rose-800 max-h-48 overflow-y-auto">
+                {state.dbErrors.map((e, i) => (
+                  <li key={i}>
+                    {e.line}行目({e.externalId}): {e.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {state.skipped.length === 0 && state.dbErrors.length === 0 && (
+            <p className="text-sm text-emerald-700">すべての行を問題なく取り込みました。</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white p-3">
+      <div className="text-xs text-stone-500">{label}</div>
+      <div className="mt-1 text-lg font-semibold tabular-nums text-stone-900">{value}</div>
+    </div>
+  );
+}

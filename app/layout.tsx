@@ -35,6 +35,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/reminders" className="hover:text-emerald-800">
                     予約リマインド
                   </Link>
+                  <Link href="/reservations/import" className="hover:text-emerald-800">
+                    予約CSV取り込み
+                  </Link>
                 </nav>
                 <div className="ml-auto flex items-center gap-3 text-sm text-stone-500">
                   <span>{session.user.name} さん</span>

@@ -58,6 +58,7 @@ model Client {
   occupation String?
   lifestyleTags Json? // 睡眠時間・飲水量・食事内容などの初回フォーム項目
   lineUserId String? @unique // LINE公式アカウントの友だち追加で取得するID(リマインド送信先)
+  externalCustomerNo String? @unique // サロンボードの「お客様番号」。顧客管理シートのID列と同一体系で、CSV取り込みの突合キーになる
 
   acquisitionChannelId String?
   acquisitionChannel   AcquisitionChannel? @relation(fields: [acquisitionChannelId], references: [id])
@@ -218,6 +219,9 @@ model Reservation {
   status        ReservationStatus @default(CONFIRMED)
   reminderSentAt DateTime?
   syncedAt      DateTime?
+
+  externalId      String? @unique // サロンボードCSVの「予約番号」。再取り込み時の重複防止キー
+  sourceStaffName String?         // CSVの「スタッフ名」列をそのまま保持(FK突合はしない参考情報)
 
   createdAt DateTime @default(now())
 
