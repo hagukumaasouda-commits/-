@@ -5,27 +5,30 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
 
 設計の背景・データベース設計の全体像は、要件整理時に作成したドラフトを参照してください(会話内の Artifact リンク)。
 
-## 本番デプロイ手順(Vercel + Neon)
+## 本番デプロイ手順(Vercel + Supabase)
 
 コード側の準備(`postinstall`でのPrisma Client生成など)は済んでいます。以下はブラウザ操作で進められます。
 
-### 1. Neon(データベース)
+要配慮個人情報を扱うため、データベースは国内(東京)で完結させる方針とし、Neonではなく**Supabase(東京リージョン)** を採用しています(検討の経緯: Neonにはアジアでシンガポール・シドニーしか無く、越境移転の論点を避けるため国内リージョンのあるSupabaseに変更)。
 
-1. https://neon.tech でアカウント作成(GitHubログイン可)
-2. 新規プロジェクト作成。リージョンは **Asia Pacific (Tokyo)** を選択
-3. 作成後に表示される接続文字列(`postgresql://...`)をコピー
-   - Vercelはサーバーレス関数のため、Neonが発行する**プーリング用接続文字列**(ホスト名に `-pooler` が付くもの)を使うことを推奨します
+### 1. Supabase(データベース)
+
+1. https://supabase.com でアカウント作成(GitHubログイン可)
+2. 新規プロジェクト作成。**Region は "Northeast Asia (Tokyo)" を選択**
+3. プロジェクト作成後、「Project Settings → Database」から接続文字列を取得します。2種類あるので使い分けてください:
+   - **Transaction pooler(ポート `6543`)** — アプリの実行時(`DATABASE_URL`)用。Vercelのサーバーレス関数から多数の短時間接続が来ることを想定したプーリング接続
+   - **Direct connection(ポート `5432`)** — マイグレーション実行時のみ使用(下記手順3)
 
 ### 2. Vercel(アプリ本体)
 
 1. https://vercel.com でアカウント作成(GitHubログイン)
 2. 「Add New Project」→ このリポジトリ(`hagukumaasouda-commits/-`)を選択してImport
-3. Framework は自動でNext.jsと検出されます。特に変更不要です
+3. Framework は自動でNext.jsと検出されます。「Project Settings → Functions → Region」で **Tokyo (hnd1)** を選択してください(アプリの実行場所も国内にするため)
 4. 「Environment Variables」に以下を設定:
 
    | 変数名 | 値 |
    |---|---|
-   | `DATABASE_URL` | Neonのプーリング接続文字列 |
+   | `DATABASE_URL` | Supabaseの **Transaction pooler** 接続文字列(ポート6543) |
    | `AUTH_SECRET` | `openssl rand -base64 32` で生成した値(ローカルの`.env`とは別に、本番専用の値を新規生成してください) |
    | `ANTHROPIC_API_KEY` | Anthropic APIキー |
    | `LINE_CHANNEL_ACCESS_TOKEN` | LINE公式アカウントのチャネルアクセストークン |
@@ -35,13 +38,17 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
 
 ### 3. 初回のみ: 本番データベースにテーブルを作成
 
-ローカルの端末から(このコード一式をクローンした上で):
+ローカルの端末から(このコード一式をクローンした上で)、**Direct connection(ポート5432)** の接続文字列を使って実行します(マイグレーションはプーリング接続だと失敗することがあるため):
 
 ```bash
-DATABASE_URL="<Neonの接続文字列>" npx prisma migrate deploy
+DATABASE_URL="<Supabaseの Direct connection 接続文字列>" npx prisma migrate deploy
 ```
 
 これでマイグレーション(テーブル定義)が本番DBに反映されます。シードデータ(架空データ)は本番には入れないでください。実際の顧客データは別途移行方法を検討します。
+
+### 補足: 「委託」としての監督について
+
+クラウド事業者へのデータ預託は、委託先を適切に監督していれば個人情報保護法上の「第三者提供」に当たらない整理が一般的です。とはいえ実際にどこまでの措置が必要かは契約内容次第のため、要配慮個人情報を扱う以上、Supabaseとの契約条件(データ処理契約・セキュリティ管理措置)について、可能であれば一度専門家(顧問弁護士・社労士等)に確認いただくことをおすすめします。今回の「東京リージョンを選ぶ」という判断は、この論点自体をできるだけ避けるための実務的な対応です。
 
 ### 4. 動作確認
 
