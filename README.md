@@ -5,6 +5,50 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
 
 設計の背景・データベース設計の全体像は、要件整理時に作成したドラフトを参照してください(会話内の Artifact リンク)。
 
+## 本番デプロイ手順(Vercel + Neon)
+
+コード側の準備(`postinstall`でのPrisma Client生成など)は済んでいます。以下はブラウザ操作で進められます。
+
+### 1. Neon(データベース)
+
+1. https://neon.tech でアカウント作成(GitHubログイン可)
+2. 新規プロジェクト作成。リージョンは **Asia Pacific (Tokyo)** を選択
+3. 作成後に表示される接続文字列(`postgresql://...`)をコピー
+   - Vercelはサーバーレス関数のため、Neonが発行する**プーリング用接続文字列**(ホスト名に `-pooler` が付くもの)を使うことを推奨します
+
+### 2. Vercel(アプリ本体)
+
+1. https://vercel.com でアカウント作成(GitHubログイン)
+2. 「Add New Project」→ このリポジトリ(`hagukumaasouda-commits/-`)を選択してImport
+3. Framework は自動でNext.jsと検出されます。特に変更不要です
+4. 「Environment Variables」に以下を設定:
+
+   | 変数名 | 値 |
+   |---|---|
+   | `DATABASE_URL` | Neonのプーリング接続文字列 |
+   | `AUTH_SECRET` | `openssl rand -base64 32` で生成した値(ローカルの`.env`とは別に、本番専用の値を新規生成してください) |
+   | `ANTHROPIC_API_KEY` | Anthropic APIキー |
+   | `LINE_CHANNEL_ACCESS_TOKEN` | LINE公式アカウントのチャネルアクセストークン |
+   | `TZ` | `Asia/Tokyo`(来店日時のタイムゾーンを正しく扱うために必須) |
+
+5. 「Deploy」をクリック
+
+### 3. 初回のみ: 本番データベースにテーブルを作成
+
+ローカルの端末から(このコード一式をクローンした上で):
+
+```bash
+DATABASE_URL="<Neonの接続文字列>" npx prisma migrate deploy
+```
+
+これでマイグレーション(テーブル定義)が本番DBに反映されます。シードデータ(架空データ)は本番には入れないでください。実際の顧客データは別途移行方法を検討します。
+
+### 4. 動作確認
+
+デプロイ後に発行されるURL(`https://xxxx.vercel.app`)にアクセスし、`/login` が表示されれば成功です。まだスタッフアカウントが本番DBに無いので、上記マイグレーション後に本番用のスタッフアカウントを作成する作業が必要です(手順は別途ご相談ください)。
+
+以降、私がこのブランチにpushするたびにVercelが自動的に再デプロイします。
+
 ## 前提・設計思想
 
 - AIは「答えを出す」役ではなく「気づきを人と人の対話につなげる」役。`awareness_checks` に保存されるだけで、
