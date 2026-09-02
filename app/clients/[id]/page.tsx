@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { CheckType } from "@/app/generated/prisma/client";
 import { runAwarenessCheck, resolveAwarenessCheck, submitDialogue } from "@/app/actions/awareness";
+import { getClientPurchaseHistory } from "@/lib/product-reports";
 
 function fmtDate(d: Date | null) {
   return d ? d.toISOString().slice(0, 10) : "—";
@@ -39,6 +40,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     },
   });
   if (!client) notFound();
+
+  const purchaseHistory = await getClientPurchaseHistory(client.id);
 
   const balance = client.prepaidCard
     ? client.prepaidCard.transactions.reduce((s, t) => s + t.amount, 0)
@@ -149,6 +152,37 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <AwarenessLane title="事務チェック(記入漏れ)" tone="office" checks={officeChecks} />
         <AwarenessLane title="AI気づき(関わりの質・離脱兆候)" tone="ai" checks={aiChecks} />
       </div>
+
+      <section className="rounded-lg border border-stone-200 bg-white p-5">
+        <h2 className="font-semibold mb-3">購入履歴(物販)</h2>
+        {purchaseHistory.length > 0 ? (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-stone-500 border-b border-stone-200">
+                <th className="py-1.5 font-normal">日付</th>
+                <th className="py-1.5 font-normal">商品</th>
+                <th className="py-1.5 font-normal">区分</th>
+                <th className="py-1.5 font-normal text-right">金額</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchaseHistory.map((p) => (
+                <tr key={p.id} className="border-b border-stone-100 last:border-0">
+                  <td className="py-1.5 text-stone-600">{fmtDate(p.saleDate)}</td>
+                  <td className="py-1.5">{p.productName}</td>
+                  <td className="py-1.5 text-stone-500 text-xs">
+                    {p.itemType === "FULL" ? "本品" : "バラ"} ・ {p.purchaseType === "NEW" ? "新規" : "リピート"}
+                    {p.isGift && <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">プレゼント</span>}
+                  </td>
+                  <td className="py-1.5 text-right tabular-nums">{p.amount.toLocaleString()}円</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="text-sm text-stone-400">購入履歴なし</p>
+        )}
+      </section>
 
       <section className="rounded-lg border border-stone-200 bg-white p-5">
         <h2 className="font-semibold mb-3">来院タイムライン</h2>

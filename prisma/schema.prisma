@@ -29,6 +29,7 @@ model Staff {
   visits              Visit[]
   staffMindsetChecks  StaffMindsetCheck[]
   awarenessDialogues  AwarenessDialogue[]
+  productSales        ProductSale[]
 }
 
 enum StaffRole {
@@ -80,6 +81,7 @@ model Client {
   prepaidCard       PrepaidCard?
   reservations      Reservation[]
   statusSnapshots   ClientStatusSnapshot[]
+  productSales      ProductSale[]
 
   @@index([acquisitionChannelId])
   @@index([primaryStaffId])
@@ -318,4 +320,59 @@ model ClientStatusSnapshot {
   statusLabel  String? // 継続 / 参加 / 納得 / 理解 / 自己決定 / 安心 / 希望 / 不安 等
 
   @@index([clientId, snapshotDate])
+}
+
+// ---------------------------------------------------------------------------
+// 物販(商品販売)
+// ---------------------------------------------------------------------------
+
+model Product {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  category  String?
+  createdAt DateTime @default(now())
+
+  sales ProductSale[]
+}
+
+enum ProductItemType {
+  FULL // 本品
+  LOOSE // バラ(サンプル・小分け)
+}
+
+enum ProductPurchaseType {
+  NEW // 新規
+  REPEAT // リピート
+}
+
+model ProductSale {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  // シート上の顧客名(お客様番号+カナ/漢字)から突合できた場合のみ設定。
+  // 突合できなかった場合も rawClientLabel に元の文字列を残し、取り込みを止めない。
+  clientId       String?
+  client         Client? @relation(fields: [clientId], references: [id])
+  rawClientLabel String?
+
+  staffId      String?
+  staff        Staff?  @relation(fields: [staffId], references: [id])
+  rawStaffName String?
+
+  saleDate         DateTime
+  amount           Int // 円。プレゼント品は0
+  itemType         ProductItemType
+  purchaseType     ProductPurchaseType
+  isGift           Boolean @default(false) // 「来店数」欄に「プレゼント」と記載されていた行
+  visitCountAtSale Int? // 「来店数(新規のみ)」列の数値(新規客のみ入る)
+
+  // 日付+顧客+商品+担当から生成する再取り込み防止キー(シートに一意なID列が無いため)
+  dedupKey   String   @unique
+  importedAt DateTime @default(now())
+
+  @@index([saleDate])
+  @@index([productId, saleDate])
+  @@index([clientId])
+  @@index([staffId])
 }
