@@ -44,7 +44,17 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
 DATABASE_URL="<Supabaseの Direct connection 接続文字列>" npx prisma migrate deploy
 ```
 
-これでマイグレーション(テーブル定義)が本番DBに反映されます。シードデータ(架空データ)は本番には入れないでください。実際の顧客データは別途移行方法を検討します。
+これでマイグレーション(テーブル定義)が本番DBに反映されます。**`prisma db seed`(架空デモデータ)は絶対に本番に対して実行しないでください。**
+
+### 4. 初回のみ: 本番用マスタデータ・スタッフアカウントの作成
+
+来店経路(院の看板・ホットペッパー等)のマスタデータだけを投入します(架空の顧客・来院データは含みません。何度実行しても安全です):
+
+```bash
+DATABASE_URL="<Supabaseの Direct connection 接続文字列>" npx tsx prisma/seed-production.ts
+```
+
+スタッフの本番アカウント(ユーザー名・パスワード)は、デモの `hagukuma-demo` を絶対に使わず、実際の値で個別に作成してください。現時点では作成用のUIが無いため、担当スタッフに直接依頼するか、この会話で作成を依頼してください。
 
 ### 補足: 「委託」としての監督について
 
