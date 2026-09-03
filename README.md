@@ -32,7 +32,7 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
    | `AUTH_SECRET` | `openssl rand -base64 32` で生成した値(ローカルの`.env`とは別に、本番専用の値を新規生成してください) |
    | `ANTHROPIC_API_KEY` | Anthropic APIキー |
    | `LINE_CHANNEL_ACCESS_TOKEN` | LINE公式アカウントのチャネルアクセストークン |
-   | `TZ` | `Asia/Tokyo`(来店日時のタイムゾーンを正しく扱うために必須) |
+   | `APP_TZ` | `Asia/Tokyo`(来店日時のタイムゾーンを正しく扱うために必須。Vercelでは変数名 `TZ` が予約済みのため `APP_TZ` という名前で受け取り、`instrumentation.ts` が起動時に反映します) |
 
 5. 「Deploy」をクリック
 
@@ -131,7 +131,7 @@ npm run dev
 - `/reservations/import` — サロンボード予約CSVの取り込み
 - `/products` — 物販売上(商品別・スタッフ別、プレゼント品は別集計、主訴×購入商品の傾向)
 
-**タイムゾーンについて**: CSV取り込み・来院日時の扱いはすべてサーバーのローカル時刻で解釈します。日本国内向けの前提のため、デプロイ時は `TZ=Asia/Tokyo` を環境変数に設定してください(未設定だとサーバーのタイムゾーンによって来店時刻がずれます)。
+**タイムゾーンについて**: CSV取り込み・来院日時の扱いはすべてサーバーのローカル時刻で解釈します。日本国内向けの前提のため、デプロイ時は `APP_TZ=Asia/Tokyo` を環境変数に設定してください(未設定だとサーバーのタイムゾーンによって来店時刻がずれます)。Vercelでは `TZ` という変数名が予約済みで使えないため、`APP_TZ` という名前にした上で `instrumentation.ts` が起動時に `process.env.TZ` へ反映しています。
 
 ## データモデル
 
