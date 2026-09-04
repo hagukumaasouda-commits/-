@@ -24,12 +24,13 @@ model Staff {
   active       Boolean   @default(true)
   createdAt    DateTime  @default(now())
 
-  primaryClients     Client[]            @relation("PrimaryStaff")
-  clientAssignments  ClientStaff[]
-  visits             Visit[]
-  staffMindsetChecks StaffMindsetCheck[]
-  awarenessDialogues AwarenessDialogue[]
-  productSales       ProductSale[]
+  primaryClients      Client[]             @relation("PrimaryStaff")
+  clientAssignments   ClientStaff[]
+  visits              Visit[]
+  staffMindsetChecks  StaffMindsetCheck[]
+  awarenessDialogues  AwarenessDialogue[]
+  productSales        ProductSale[]
+  prepaidTransactions PrepaidTransaction[]
 
   departuresConfirmed     DepartureRecord[]     @relation("DepartureConfirmedBy")
   followupsContacted      FollowupCheckpoint[]  @relation("FollowupContactedBy")
@@ -81,6 +82,9 @@ model Client {
   firstVisitDate DateTime?
   isActive       Boolean   @default(true) // 離脱バッチが更新するフラグ
   createdAt      DateTime  @default(now())
+
+  medicalHistory String? // 既往(自由記述)
+  familyData     String? // 家族データ(自由記述)
 
   visits               Visit[]
   treatmentCourses     TreatmentCourse[]
@@ -157,6 +161,9 @@ model ChartRecord {
 
   requiredVisitInterval VisitInterval? // 必要来院ペース。離脱候補判定に、その顧客の直近の値を使う(未記録なら42日固定にフォールバック)
 
+  lifestyleSupportStatus Json? // 生活習慣サポート実施状況(てる1〜Bトレ等、社内略称キーの済/未マップ。lib/tags.ts の LIFESTYLE_SUPPORT_ITEMS)
+  healthPracticeNote     String? // 健康実践状況(自由記述。来院ごとに記録し、タイムラインで時系列に蓄積する)
+
   createdAt DateTime @default(now())
 }
 
@@ -213,6 +220,9 @@ model PrepaidTransaction {
 
   visitId String?
   visit   Visit?  @relation(fields: [visitId], references: [id])
+
+  staffId String? // 記録した担当スタッフ(手入力の台帳運用のため。仕様書 v2 3.1)
+  staff   Staff?  @relation(fields: [staffId], references: [id])
 
   note String?
 
@@ -345,10 +355,12 @@ model ClientStatusSnapshot {
 // ---------------------------------------------------------------------------
 
 model Product {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  category  String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String   @unique
+  category     String?
+  defaultPrice Int? // 参考価格(円)。購入記録フォームの初期値に使うのみで、記録時に金額は上書き可能
+  active       Boolean  @default(true) // 取り扱い終了品を選択肢から外すためのフラグ(削除はしない)
+  createdAt    DateTime @default(now())
 
   sales ProductSale[]
 }
@@ -380,6 +392,7 @@ model ProductSale {
 
   saleDate         DateTime
   amount           Int // 円。プレゼント品は0
+  quantity         Int? // 個数(手入力運用のみ。CSV取り込み分は無し)
   itemType         ProductItemType
   purchaseType     ProductPurchaseType
   isGift           Boolean             @default(false) // 「来店数」欄に「プレゼント」と記載されていた行
