@@ -6,6 +6,7 @@ import { runAwarenessCheck, resolveAwarenessCheck, submitDialogue } from "@/app/
 import { confirmDeparture, recordFollowupContact } from "@/app/actions/departures";
 import { requestReassignment, resolveReassignment } from "@/app/actions/reassignments";
 import { recordPrepaidTransaction } from "@/app/actions/prepaid";
+import { recordProductSale } from "@/app/actions/products";
 import { getClientPurchaseHistory } from "@/lib/product-reports";
 
 const visitIntervalLabel: Record<string, string> = {
@@ -88,6 +89,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
   const purchaseHistory = await getClientPurchaseHistory(client.id);
   const allStaff = await prisma.staff.findMany({ where: { active: true }, orderBy: { name: "asc" } });
+  const activeProducts = await prisma.product.findMany({ where: { active: true }, orderBy: { name: "asc" } });
   const openReassignment = client.reassignmentRequests.find((r) => r.status === "IN_DISCUSSION");
 
   const balance = client.prepaidCard
@@ -189,12 +191,15 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               <div className="text-xs text-stone-500 mb-3">プラン: {client.prepaidCard.planType ?? "—"}</div>
               <ul className="flex flex-col gap-1 text-sm">
                 {client.prepaidCard.transactions.map((t) => (
-                  <li key={t.id} className="flex justify-between text-stone-600">
-                    <span>
-                      {fmtDate(t.txDate)} {t.txType === "CHARGE" ? "入金" : t.txType === "USE" ? "使用" : "訂正"}
-                      {t.staff && <span className="text-xs text-stone-400"> ・ {t.staff.name}</span>}
-                    </span>
-                    <span className="tabular-nums">{t.amount > 0 ? "+" : ""}{t.amount.toLocaleString()}円</span>
+                  <li key={t.id} className="flex flex-col text-stone-600">
+                    <div className="flex justify-between">
+                      <span>
+                        {fmtDate(t.txDate)} {t.txType === "CHARGE" ? "入金" : t.txType === "USE" ? "使用" : "訂正"}
+                        {t.staff && <span className="text-xs text-stone-400"> ・ {t.staff.name}</span>}
+                      </span>
+                      <span className="tabular-nums">{t.amount > 0 ? "+" : ""}{t.amount.toLocaleString()}円</span>
+                    </div>
+                    {t.note && <span className="text-xs text-stone-400">{t.note}</span>}
                   </li>
                 ))}
               </ul>
@@ -477,6 +482,56 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         ) : (
           <p className="text-sm text-stone-400">購入履歴なし</p>
         )}
+
+        <details className="mt-4">
+          <summary className="cursor-pointer text-sm font-medium text-stone-700">物販購入を記録する</summary>
+          <form action={recordProductSale.bind(null, client.id)} className="mt-2 flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <select name="productId" required className="input py-1.5 text-sm">
+                <option value="">商品を選択</option>
+                {activeProducts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                    {p.defaultPrice != null ? `(参考: ${p.defaultPrice.toLocaleString()}円)` : ""}
+                  </option>
+                ))}
+              </select>
+              <input type="number" name="amount" placeholder="金額(プレゼント品は0のままでOK)" className="input py-1.5 text-sm" />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <input type="number" name="quantity" placeholder="個数" className="input py-1.5 text-sm" />
+              <select name="itemType" className="input py-1.5 text-sm">
+                <option value="FULL">本品</option>
+                <option value="LOOSE">バラ</option>
+              </select>
+              <select name="purchaseType" className="input py-1.5 text-sm">
+                <option value="NEW">新規</option>
+                <option value="REPEAT">リピート</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input type="date" name="saleDate" defaultValue={new Date().toISOString().slice(0, 10)} className="input py-1.5 text-sm" />
+              <select name="staffId" className="input py-1.5 text-sm">
+                <option value="">担当スタッフ</option>
+                {allStaff.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-1.5 text-sm text-stone-700">
+              <input type="checkbox" name="isGift" value="true" className="accent-emerald-800" />
+              プレゼント品(無料配布)
+            </label>
+            <button type="submit" className="rounded-md bg-stone-800 px-3 py-1.5 text-sm font-medium text-white w-fit">
+              記録する
+            </button>
+          </form>
+          <p className="mt-1 text-xs text-stone-500">
+            商品の追加・価格の修正は<Link href="/products/manage" className="underline">商品マスタを管理</Link>から行えます。
+          </p>
+        </details>
       </section>
 
       <section className="rounded-lg border border-stone-200 bg-white p-5">

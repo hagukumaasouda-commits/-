@@ -51,6 +51,9 @@ export default async function ProductsPage({
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm">
+          <Link href="/products/manage" className="rounded-md border border-stone-300 bg-white px-3 py-1.5 hover:bg-stone-100">
+            商品マスタを管理
+          </Link>
           <div className="flex rounded-md border border-stone-300 overflow-hidden">
             <Link
               href={`/products?granularity=week`}
