@@ -36,6 +36,14 @@ export const BODY_PART_TAGS = [
   "手",
 ] as const;
 
+// 施術メニュー表(参考価格。表示のみ、会計計算には連動させない)。
+export const TREATMENT_MENU = [
+  { name: "ベーシックケア", memberPrice: 4200, generalPrice: 4600 },
+  { name: "リペアネスプラン", memberPrice: 5500, generalPrice: 6000 },
+  { name: "コンディショニングプラン", memberPrice: 6800, generalPrice: 7300 },
+  { name: "ウェルネスプラン", memberPrice: 8200, generalPrice: 8700 },
+] as const;
+
 // 生活習慣サポート実施状況(初回カルテVer1.0の項目をそのまま踏襲。社内略称のまま表示する)。
 export const LIFESTYLE_SUPPORT_ITEMS = [
   "てる1",

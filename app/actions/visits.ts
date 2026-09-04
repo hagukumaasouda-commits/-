@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { VisitInterval } from "@/app/generated/prisma/client";
+import { LIFESTYLE_SUPPORT_ITEMS } from "@/lib/tags";
 
 export async function createVisit(clientId: string, formData: FormData) {
   const staffId = String(formData.get("staffId") || "");
@@ -19,6 +20,11 @@ export async function createVisit(clientId: string, formData: FormData) {
   const bodyPartTags = formData.getAll("bodyPartTags").map(String);
   const requiredVisitIntervalRaw = String(formData.get("requiredVisitInterval") || "");
   const requiredVisitInterval = requiredVisitIntervalRaw ? (requiredVisitIntervalRaw as VisitInterval) : null;
+  const healthPracticeNote = String(formData.get("healthPracticeNote") || "") || null;
+  const checkedLifestyleItems = new Set(formData.getAll("lifestyleSupportStatus").map(String));
+  const lifestyleSupportStatus = Object.fromEntries(
+    LIFESTYLE_SUPPORT_ITEMS.map((item) => [item, checkedLifestyleItems.has(item)])
+  );
 
   const existingCount = await prisma.visit.count({ where: { clientId } });
   const visitNo = existingCount + 1;
@@ -44,6 +50,8 @@ export async function createVisit(clientId: string, formData: FormData) {
       nextRequired,
       clientVoice,
       requiredVisitInterval,
+      lifestyleSupportStatus,
+      healthPracticeNote,
     },
   });
 

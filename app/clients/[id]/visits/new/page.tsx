@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { createVisit } from "@/app/actions/visits";
-import { CHIEF_COMPLAINT_TAGS, BODY_PART_TAGS } from "@/lib/tags";
+import { CHIEF_COMPLAINT_TAGS, BODY_PART_TAGS, LIFESTYLE_SUPPORT_ITEMS, TREATMENT_MENU } from "@/lib/tags";
 import { notFound } from "next/navigation";
 
 export default async function NewVisitPage({ params }: { params: Promise<{ id: string }> }) {
@@ -37,12 +37,45 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
           <input name="menu" className="input" placeholder="例: 全身調整" />
         </Field>
 
+        <details className="rounded-md border border-stone-200 bg-stone-50 p-3">
+          <summary className="cursor-pointer text-sm text-stone-600">施術メニュー表(参考価格。会計への連動はありません)</summary>
+          <table className="mt-2 w-full text-xs">
+            <thead>
+              <tr className="text-left text-stone-500 border-b border-stone-200">
+                <th className="py-1 font-normal">プラン</th>
+                <th className="py-1 font-normal">会員価格</th>
+                <th className="py-1 font-normal">一般価格</th>
+              </tr>
+            </thead>
+            <tbody>
+              {TREATMENT_MENU.map((m) => (
+                <tr key={m.name} className="border-b border-stone-100 last:border-0">
+                  <td className="py-1">{m.name}</td>
+                  <td className="py-1">{m.memberPrice.toLocaleString()}円</td>
+                  <td className="py-1">{m.generalPrice.toLocaleString()}円</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-2 text-xs text-stone-500">
+            昔からの顧客は特別料金の場合があります。実際の請求額はプリカ台帳・物販記録にその都度手入力してください。
+          </p>
+        </details>
+
         <Field label="主訴タグ">
           <TagCheckboxes name="chiefComplaintTags" options={CHIEF_COMPLAINT_TAGS} />
         </Field>
 
         <Field label="施術部位タグ">
           <TagCheckboxes name="bodyPartTags" options={BODY_PART_TAGS} />
+        </Field>
+
+        <Field label="生活習慣サポート実施状況">
+          <TagCheckboxes name="lifestyleSupportStatus" options={LIFESTYLE_SUPPORT_ITEMS} />
+        </Field>
+
+        <Field label="健康実践状況">
+          <textarea name="healthPracticeNote" rows={2} className="input" placeholder="ストレッチ・トレーニングなど、今回の実践内容を自由に記入" />
         </Field>
 
         <Field label="評価(何が起きているか)">

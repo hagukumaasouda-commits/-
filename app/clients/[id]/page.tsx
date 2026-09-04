@@ -5,6 +5,7 @@ import { CheckType } from "@/app/generated/prisma/client";
 import { runAwarenessCheck, resolveAwarenessCheck, submitDialogue } from "@/app/actions/awareness";
 import { confirmDeparture, recordFollowupContact } from "@/app/actions/departures";
 import { requestReassignment, resolveReassignment } from "@/app/actions/reassignments";
+import { recordPrepaidTransaction } from "@/app/actions/prepaid";
 import { getClientPurchaseHistory } from "@/lib/product-reports";
 
 const visitIntervalLabel: Record<string, string> = {
@@ -66,7 +67,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       acquisitionChannel: true,
       referredBy: { select: { id: true, name: true } },
       referrals: { select: { id: true, name: true } },
-      prepaidCard: { include: { transactions: { orderBy: { txDate: "desc" }, take: 10 } } },
+      prepaidCard: { include: { transactions: { orderBy: { txDate: "desc" }, take: 10, include: { staff: true } } } },
       treatmentCourses: { orderBy: { courseNo: "desc" } },
       reservations: { orderBy: { reservedAt: "desc" }, take: 5 },
       visits: {
@@ -90,7 +91,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const openReassignment = client.reassignmentRequests.find((r) => r.status === "IN_DISCUSSION");
 
   const balance = client.prepaidCard
-    ? client.prepaidCard.transactions.reduce((s, t) => s + t.amount, 0)
+    ? (
+        await prisma.prepaidTransaction.aggregate({
+          where: { cardId: client.prepaidCard.id },
+          _sum: { amount: true },
+        })
+      )._sum.amount ?? 0
     : null;
 
   const officeChecks = client.visits.flatMap((v) =>
@@ -112,9 +118,14 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           </h1>
           <p className="text-sm text-stone-500 mt-1">{client.kana}</p>
         </div>
-        <Link href={`/clients/${client.id}/visits/new`} className="rounded-md bg-emerald-800 px-4 py-2 text-sm font-medium text-white">
-          来院を記録する
-        </Link>
+        <div className="flex gap-2">
+          <Link href={`/clients/${client.id}/edit`} className="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
+            顧客情報を編集
+          </Link>
+          <Link href={`/clients/${client.id}/visits/new`} className="rounded-md bg-emerald-800 px-4 py-2 text-sm font-medium text-white">
+            来院を記録する
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -123,6 +134,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <dl className="flex flex-col gap-2 text-sm">
             <Row label="性別" value={client.gender ?? "—"} />
             <Row label="電話" value={client.phone ?? "—"} />
+            <Row label="住所" value={client.address ? `${client.postalCode ? `〒${client.postalCode} ` : ""}${client.address}` : "—"} />
+            <Row label="職業" value={client.occupation ?? "—"} />
             <Row label="来店きっかけ" value={client.acquisitionChannel?.name ?? "—"} />
             <Row
               label="紹介元"
@@ -150,6 +163,22 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               />
             )}
           </dl>
+          {(client.medicalHistory || client.familyData) && (
+            <div className="mt-3 flex flex-col gap-2 border-t border-stone-100 pt-3 text-sm">
+              {client.medicalHistory && (
+                <p>
+                  <span className="text-stone-500">既往: </span>
+                  {client.medicalHistory}
+                </p>
+              )}
+              {client.familyData && (
+                <p>
+                  <span className="text-stone-500">家族データ: </span>
+                  {client.familyData}
+                </p>
+              )}
+            </div>
+          )}
         </section>
 
         <section className="rounded-lg border border-stone-200 bg-white p-5 lg:col-span-1">
@@ -161,15 +190,82 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               <ul className="flex flex-col gap-1 text-sm">
                 {client.prepaidCard.transactions.map((t) => (
                   <li key={t.id} className="flex justify-between text-stone-600">
-                    <span>{fmtDate(t.txDate)} {t.txType === "CHARGE" ? "チャージ" : t.txType === "USE" ? "利用" : "訂正"}</span>
+                    <span>
+                      {fmtDate(t.txDate)} {t.txType === "CHARGE" ? "入金" : t.txType === "USE" ? "使用" : "訂正"}
+                      {t.staff && <span className="text-xs text-stone-400"> ・ {t.staff.name}</span>}
+                    </span>
                     <span className="tabular-nums">{t.amount > 0 ? "+" : ""}{t.amount.toLocaleString()}円</span>
                   </li>
                 ))}
               </ul>
             </>
           ) : (
-            <p className="text-sm text-stone-400">プリカ未発行</p>
+            <p className="text-sm text-stone-400 mb-3">プリカ未発行(下のフォームから記録すると発行されます)</p>
           )}
+
+          <details className="mt-3">
+            <summary className="cursor-pointer text-sm font-medium text-stone-700">入出金を記録する</summary>
+            <form action={recordPrepaidTransaction.bind(null, client.id)} className="mt-2 flex flex-col gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <select name="txType" required className="input py-1.5 text-sm">
+                  <option value="CHARGE">入金</option>
+                  <option value="USE">使用</option>
+                  <option value="ADJUST">訂正(±そのまま入力)</option>
+                </select>
+                <input type="number" name="amount" required placeholder="金額" className="input py-1.5 text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="date" name="txDate" defaultValue={new Date().toISOString().slice(0, 10)} className="input py-1.5 text-sm" />
+                <select name="staffId" className="input py-1.5 text-sm">
+                  <option value="">担当スタッフ</option>
+                  {allStaff.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <input name="note" placeholder="メモ(例: ポイント2倍イベントで22,000円付与)" className="input py-1.5 text-sm" />
+              <button type="submit" className="rounded-md bg-stone-800 px-3 py-1.5 text-sm font-medium text-white w-fit">
+                記録する
+              </button>
+            </form>
+          </details>
+
+          <details className="mt-2">
+            <summary className="cursor-pointer text-xs text-stone-500">ポイント付与の早見表(参考・入力には連動しません)</summary>
+            <table className="mt-2 w-full text-xs">
+              <thead>
+                <tr className="text-left text-stone-500 border-b border-stone-200">
+                  <th className="py-1 font-normal">入金額</th>
+                  <th className="py-1 font-normal">通常付与</th>
+                  <th className="py-1 font-normal">ポイント2倍時</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-stone-100">
+                  <td className="py-1">10,000円</td>
+                  <td className="py-1">ボーナスなし</td>
+                  <td className="py-1">ー</td>
+                </tr>
+                <tr className="border-b border-stone-100">
+                  <td className="py-1">20,000円</td>
+                  <td className="py-1">21,000円</td>
+                  <td className="py-1">22,000円</td>
+                </tr>
+                <tr className="border-b border-stone-100">
+                  <td className="py-1">30,000円</td>
+                  <td className="py-1">32,000円</td>
+                  <td className="py-1">34,000円</td>
+                </tr>
+                <tr>
+                  <td className="py-1">50,000円</td>
+                  <td className="py-1">54,000円</td>
+                  <td className="py-1">58,000円</td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
         </section>
 
         <section className="rounded-lg border border-stone-200 bg-white p-5 lg:col-span-1">
@@ -406,6 +502,16 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                     {v.chartRecord.changeFromLast && <p>前回からの変化: {v.chartRecord.changeFromLast}</p>}
                     {v.chartRecord.clientVoice && <p>お客様の声: {v.chartRecord.clientVoice}</p>}
                     {v.chartRecord.nextCheck && <p>次回確認: {v.chartRecord.nextCheck}</p>}
+                    {v.chartRecord.healthPracticeNote && <p>健康実践状況: {v.chartRecord.healthPracticeNote}</p>}
+                    {v.chartRecord.lifestyleSupportStatus != null && (
+                      <p>
+                        生活習慣サポート:{" "}
+                        {Object.entries(v.chartRecord.lifestyleSupportStatus as Record<string, boolean>)
+                          .filter(([, done]) => done)
+                          .map(([item]) => item)
+                          .join("、") || "実施項目なし"}
+                      </p>
+                    )}
                   </div>
                 )}
               </details>
