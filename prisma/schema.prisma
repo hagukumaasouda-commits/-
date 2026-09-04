@@ -16,20 +16,26 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model Staff {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   name         String
-  username     String?  @unique
+  username     String?   @unique
   passwordHash String?
   role         StaffRole @default(STAFF)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
 
-  primaryClients      Client[]            @relation("PrimaryStaff")
-  clientAssignments   ClientStaff[]
-  visits              Visit[]
-  staffMindsetChecks  StaffMindsetCheck[]
-  awarenessDialogues  AwarenessDialogue[]
-  productSales        ProductSale[]
+  primaryClients     Client[]            @relation("PrimaryStaff")
+  clientAssignments  ClientStaff[]
+  visits             Visit[]
+  staffMindsetChecks StaffMindsetCheck[]
+  awarenessDialogues AwarenessDialogue[]
+  productSales       ProductSale[]
+
+  departuresConfirmed     DepartureRecord[]     @relation("DepartureConfirmedBy")
+  followupsContacted      FollowupCheckpoint[]  @relation("FollowupContactedBy")
+  reassignmentsAsCurrent  ReassignmentRequest[] @relation("ReassignmentCurrentStaff")
+  reassignmentsRequested  ReassignmentRequest[] @relation("ReassignmentRequestedBy")
+  reassignmentsAsNewStaff ReassignmentRequest[] @relation("ReassignmentNewStaff")
 }
 
 enum StaffRole {
@@ -48,18 +54,18 @@ model AcquisitionChannel {
 // ---------------------------------------------------------------------------
 
 model Client {
-  id        String    @id @default(cuid())
-  name      String
-  kana      String?
-  dob       DateTime?
-  gender    String?
-  phone     String?
-  postalCode String?
-  address   String?
-  occupation String?
-  lifestyleTags Json? // 睡眠時間・飲水量・食事内容などの初回フォーム項目
-  lineUserId String? @unique // LINE公式アカウントの友だち追加で取得するID(リマインド送信先)
-  externalCustomerNo String? @unique // サロンボードの「お客様番号」。顧客管理シートのID列と同一体系で、CSV取り込みの突合キーになる
+  id                 String    @id @default(cuid())
+  name               String
+  kana               String?
+  dob                DateTime?
+  gender             String?
+  phone              String?
+  postalCode         String?
+  address            String?
+  occupation         String?
+  lifestyleTags      Json? // 睡眠時間・飲水量・食事内容などの初回フォーム項目
+  lineUserId         String?   @unique // LINE公式アカウントの友だち追加で取得するID(リマインド送信先)
+  externalCustomerNo String?   @unique // サロンボードの「お客様番号」。顧客管理シートのID列と同一体系で、CSV取り込みの突合キーになる
 
   acquisitionChannelId String?
   acquisitionChannel   AcquisitionChannel? @relation(fields: [acquisitionChannelId], references: [id])
@@ -68,20 +74,22 @@ model Client {
   referredBy   Client?  @relation("Referral", fields: [referredById], references: [id])
   referrals    Client[] @relation("Referral")
 
-  primaryStaffId String?
-  primaryStaff   Staff?  @relation("PrimaryStaff", fields: [primaryStaffId], references: [id])
+  primaryStaffId   String?
+  primaryStaff     Staff?        @relation("PrimaryStaff", fields: [primaryStaffId], references: [id])
   staffAssignments ClientStaff[]
 
   firstVisitDate DateTime?
   isActive       Boolean   @default(true) // 離脱バッチが更新するフラグ
   createdAt      DateTime  @default(now())
 
-  visits            Visit[]
-  treatmentCourses  TreatmentCourse[]
-  prepaidCard       PrepaidCard?
-  reservations      Reservation[]
-  statusSnapshots   ClientStatusSnapshot[]
-  productSales      ProductSale[]
+  visits               Visit[]
+  treatmentCourses     TreatmentCourse[]
+  prepaidCard          PrepaidCard?
+  reservations         Reservation[]
+  statusSnapshots      ClientStatusSnapshot[]
+  productSales         ProductSale[]
+  departureRecords     DepartureRecord[]
+  reassignmentRequests ReassignmentRequest[]
 
   @@index([acquisitionChannelId])
   @@index([primaryStaffId])
@@ -103,27 +111,27 @@ model ClientStaff {
 // ---------------------------------------------------------------------------
 
 model Visit {
-  id        String   @id @default(cuid())
-  clientId  String
-  client    Client   @relation(fields: [clientId], references: [id])
-  staffId   String
-  staff     Staff    @relation(fields: [staffId], references: [id])
-  courseId  String?
-  course    TreatmentCourse? @relation(fields: [courseId], references: [id])
+  id       String           @id @default(cuid())
+  clientId String
+  client   Client           @relation(fields: [clientId], references: [id])
+  staffId  String
+  staff    Staff            @relation(fields: [staffId], references: [id])
+  courseId String?
+  course   TreatmentCourse? @relation(fields: [courseId], references: [id])
 
   visitDate DateTime
-  visitNo   Int      // その顧客にとって何回目の来院か(作成時に算出)
+  visitNo   Int // その顧客にとって何回目の来院か(作成時に算出)
   menu      String?
 
   createdAt DateTime @default(now())
 
-  chartRecord      ChartRecord?
-  awarenessChecks  AwarenessCheck[]
-  mindsetChecks    StaffMindsetCheck[]
-  prepaidTxns      PrepaidTransaction[]
+  chartRecord     ChartRecord?
+  awarenessChecks AwarenessCheck[]
+  mindsetChecks   StaffMindsetCheck[]
+  prepaidTxns     PrepaidTransaction[]
 
-  @@index([clientId, visitDate])
   @@unique([clientId, visitNo])
+  @@index([clientId, visitDate])
 }
 
 model ChartRecord {
@@ -134,20 +142,30 @@ model ChartRecord {
   chiefComplaintTags String[] // 肩こり / 腰痛 / 自律神経症状 など(来院理由分布に使用)
   bodyPartTags       String[] // 頭蓋 / 内臓 / 上肢 / 下肢 / 脊椎 / 体幹(施術部位分布に使用)
 
-  exam              Json?   // 可動域・脊椎状態・重心軸などの検査値
-  treatmentDetail   Json?   // 部位×体位×コメントの施術詳細
+  exam            Json? // 可動域・脊椎状態・重心軸などの検査値
+  treatmentDetail Json? // 部位×体位×コメントの施術詳細
 
-  evaluation        String? // 何が起きているか
-  changeFromLast    String? // 前回からの変化
-  reevaluation      String? // 何が変わったか(再評価)
-  meaningConveyed   String? // 患者さんへどう伝えたか
-  clientVoice       String? // お客様の声(自己認識)
-  nextCheck         String? // 次回確認
-  nextRequired      String? // 次回必須
+  evaluation      String? // 何が起きているか
+  changeFromLast  String? // 前回からの変化
+  reevaluation    String? // 何が変わったか(再評価)
+  meaningConveyed String? // 患者さんへどう伝えたか
+  clientVoice     String? // お客様の声(自己認識)
+  nextCheck       String? // 次回確認
+  nextRequired    String? // 次回必須
 
-  requiredFields    Json?   // 必須項目チェックリストの状態(未/完) -> 事務チェックが参照
+  requiredFields Json? // 必須項目チェックリストの状態(未/完) -> 事務チェックが参照
 
-  createdAt         DateTime @default(now())
+  requiredVisitInterval VisitInterval? // 必要来院ペース。離脱候補判定に、その顧客の直近の値を使う(未記録なら42日固定にフォールバック)
+
+  createdAt DateTime @default(now())
+}
+
+enum VisitInterval {
+  WEEKLY // 週1回 = 7日
+  BIWEEKLY // 2週に1回 = 14日
+  TRIWEEKLY // 3週に1回 = 21日
+  MONTHLY // 月1回 = 30日
+  MAINTENANCE // 2ヶ月に1回(メンテナンス) = 60日
 }
 
 // ---------------------------------------------------------------------------
@@ -155,14 +173,14 @@ model ChartRecord {
 // ---------------------------------------------------------------------------
 
 model TreatmentCourse {
-  id       String  @id @default(cuid())
+  id       String @id @default(cuid())
   clientId String
-  client   Client  @relation(fields: [clientId], references: [id])
+  client   Client @relation(fields: [clientId], references: [id])
 
-  courseNo         Int     // 1クール, 2クール ...
-  planType         String  // 都度 / プ1万 / プ2万 / プ3万 / 会員 / お試し / 自賠 等
+  courseNo         Int // 1クール, 2クール ...
+  planType         String // 都度 / プ1万 / プ2万 / プ3万 / 会員 / お試し / 自賠 等
   plannedSessions  Int?
-  durationProposal Json?   // 1.5ヶ月40% / 2ヶ月55% / 3ヶ月50% などの継続提案
+  durationProposal Json? // 1.5ヶ月40% / 2ヶ月55% / 3ヶ月50% などの継続提案
   goal             String? // 解決したいこと(顕在・深層ニーズ)
 
   startDate DateTime?
@@ -176,22 +194,22 @@ model PrepaidCard {
   clientId String @unique
   client   Client @relation(fields: [clientId], references: [id])
 
-  planType  String?
-  openedAt  DateTime @default(now())
-  closedAt  DateTime?
+  planType String?
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
 
   transactions PrepaidTransaction[]
 }
 
 model PrepaidTransaction {
-  id     String @id @default(cuid())
+  id     String      @id @default(cuid())
   cardId String
   card   PrepaidCard @relation(fields: [cardId], references: [id])
 
-  txType      PrepaidTxType
-  amount      Int      // charge は正, use は負で記録
-  balanceAfter Int?    // 計算結果のスナップショット(表示高速化用。真実はSUMで再計算可能)
-  txDate      DateTime @default(now())
+  txType       PrepaidTxType
+  amount       Int // charge は正, use は負で記録
+  balanceAfter Int? // 計算結果のスナップショット(表示高速化用。真実はSUMで再計算可能)
+  txDate       DateTime      @default(now())
 
   visitId String?
   visit   Visit?  @relation(fields: [visitId], references: [id])
@@ -216,14 +234,14 @@ model Reservation {
   clientId String
   client   Client @relation(fields: [clientId], references: [id])
 
-  source        ReservationSource @default(MANUAL)
-  reservedAt    DateTime
-  status        ReservationStatus @default(CONFIRMED)
+  source         ReservationSource @default(MANUAL)
+  reservedAt     DateTime
+  status         ReservationStatus @default(CONFIRMED)
   reminderSentAt DateTime?
-  syncedAt      DateTime?
+  syncedAt       DateTime?
 
   externalId      String? @unique // サロンボードCSVの「予約番号」。再取り込み時の重複防止キー
-  sourceStaffName String?         // CSVの「スタッフ名」列をそのまま保持(FK突合はしない参考情報)
+  sourceStaffName String? // CSVの「スタッフ名」列をそのまま保持(FK突合はしない参考情報)
 
   createdAt DateTime @default(now())
 
@@ -254,9 +272,9 @@ model AwarenessCheck {
   visit   Visit  @relation(fields: [visitId], references: [id])
 
   checkType CheckType // OFFICE(ルールベース記入漏れ) / AI_INSIGHT(関わりの質・離脱兆候)
-  category  String    // 記入漏れ / 頻度と関わりのギャップ / 来店間隔の変化 / 残高消化と来店の乖離 / 施術内容の変化 等
-  message   String    // AIや事務チェックが提示する気づき文(断定ではなく問いかけ調)
-  severity  Severity  @default(INFO)
+  category  String // 記入漏れ / 頻度と関わりのギャップ / 来店間隔の変化 / 残高消化と来店の乖離 / 施術内容の変化 等
+  message   String // AIや事務チェックが提示する気づき文(断定ではなく問いかけ調)
+  severity  Severity    @default(INFO)
   status    CheckStatus @default(OPEN)
 
   createdAt DateTime @default(now())
@@ -285,13 +303,13 @@ enum CheckStatus {
 }
 
 model AwarenessDialogue {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   awarenessCheckId String
   awarenessCheck   AwarenessCheck @relation(fields: [awarenessCheckId], references: [id])
   authorStaffId    String
-  authorStaff      Staff    @relation(fields: [authorStaffId], references: [id])
+  authorStaff      Staff          @relation(fields: [authorStaffId], references: [id])
   comment          String
-  createdAt        DateTime @default(now())
+  createdAt        DateTime       @default(now())
 }
 
 // 継続カルテ由来: 施術者マインド・フロントトークの自己点検(監視ではなく振り返り用途)
@@ -316,7 +334,7 @@ model ClientStatusSnapshot {
 
   snapshotDate DateTime
   rank         String? // AS / A / B / C1 / C2 / C3
-  healthScore  Int?    // 健康度幸福度(%)
+  healthScore  Int? // 健康度幸福度(%)
   statusLabel  String? // 継続 / 参加 / 納得 / 理解 / 自己決定 / 安心 / 希望 / 不安 等
 
   @@index([clientId, snapshotDate])
@@ -364,7 +382,7 @@ model ProductSale {
   amount           Int // 円。プレゼント品は0
   itemType         ProductItemType
   purchaseType     ProductPurchaseType
-  isGift           Boolean @default(false) // 「来店数」欄に「プレゼント」と記載されていた行
+  isGift           Boolean             @default(false) // 「来店数」欄に「プレゼント」と記載されていた行
   visitCountAtSale Int? // 「来店数(新規のみ)」列の数値(新規客のみ入る)
 
   // 日付+顧客+商品+担当から生成する再取り込み防止キー(シートに一意なID列が無いため)
@@ -375,4 +393,129 @@ model ProductSale {
   @@index([productId, saleDate])
   @@index([clientId])
   @@index([staffId])
+}
+
+// ---------------------------------------------------------------------------
+// 離脱フォローアップ・担当変更(仕様書 v2: docs/departure-followup-spec-v2.md)
+// ---------------------------------------------------------------------------
+
+model DepartureRecord {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  confirmedById String
+  confirmedBy   Staff    @relation("DepartureConfirmedBy", fields: [confirmedById], references: [id])
+  confirmedAt   DateTime @default(now()) // フォロースケジュールの起点日
+
+  reason     DepartureReason? // triggeredByCancellation の未確定候補は空欄可
+  reasonNote String? // 「その他」選択時の自由記述、補足メモ
+
+  triggeredByCancellation Boolean @default(false) // true: キャンセル後未予約がきっかけ(仕様書 2.5)
+
+  checkpoints FollowupCheckpoint[]
+
+  @@index([clientId])
+}
+
+enum DepartureReason {
+  GRADUATED // 症状改善による卒業(満足)
+  TRIAL_ONLY // お試し利用(元々継続意思なし)
+  TEMPORARY_VISITOR // 遠方からの一時利用(帰省・出張等)
+  SWITCHED_BRANCH // 砥部店(他店舗)へ変更
+  NO_PERCEIVED_EFFECT // 効果を実感できなかった
+  LIFE_CHANGE // 体調・環境の変化(妊娠・出産・病気・怪我等)
+  STAFF_MINDSET_LACK // こちら側のマインド不足
+  OTHER // その他(自由記述)
+}
+
+// DepartureRecord 作成時に5件自動生成する(仕様書 2.4)
+model FollowupCheckpoint {
+  id                String          @id @default(cuid())
+  departureRecordId String
+  departureRecord   DepartureRecord @relation(fields: [departureRecordId], references: [id])
+
+  stage         CheckpointStage
+  scheduledDate DateTime
+
+  status        FollowupStatus    @default(PENDING)
+  contactMethod ContactMethod?
+  response      FollowupResponse?
+
+  contactedById String?
+  contactedBy   Staff?    @relation("FollowupContactedBy", fields: [contactedById], references: [id])
+  contactedAt   DateTime?
+
+  note String?
+
+  @@index([departureRecordId])
+  @@index([scheduledDate])
+}
+
+enum CheckpointStage {
+  WEEK3
+  WEEK6
+  MONTH3
+  MONTH6
+  YEAR1
+}
+
+enum FollowupStatus {
+  PENDING // 未対応
+  CONTACTED // 連絡済み
+}
+
+enum ContactMethod {
+  LINE
+  PHONE
+  LETTER // 手紙・はがき
+  IN_PERSON // 対面(来店時)
+  OTHER
+}
+
+enum FollowupResponse {
+  WILLING_TO_CONTINUE // 反応あり(継続の意思)
+  NOT_CONTINUING // 反応あり(継続なし)
+  NO_RESPONSE // 反応なし
+  NOT_DONE // 未実施
+}
+
+// 離脱の手前で、担当スタッフとの関係性に課題がある場合に使う相談機能(仕様書 2.6)
+model ReassignmentRequest {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  currentStaffId String
+  currentStaff   Staff  @relation("ReassignmentCurrentStaff", fields: [currentStaffId], references: [id])
+
+  initiatedBy        ReassignmentInitiator
+  requestedByStaffId String? // 気づきチェック起点の場合は空
+  requestedByStaff   Staff?                @relation("ReassignmentRequestedBy", fields: [requestedByStaffId], references: [id])
+
+  note String? // 相談メモ
+
+  status ReassignmentStatus @default(IN_DISCUSSION)
+
+  newStaffId   String? // 変更確定時の新担当
+  newStaff     Staff?  @relation("ReassignmentNewStaff", fields: [newStaffId], references: [id])
+  handoverNote String? // 引き継ぎメモ(何を伝えたか・注意点)
+
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  @@index([clientId])
+  @@index([status])
+}
+
+enum ReassignmentInitiator {
+  STAFF_SELF // スタッフ本人
+  DIRECTOR // 院長
+  AWARENESS_CHECK // 気づきチェック(自動検知)
+}
+
+enum ReassignmentStatus {
+  IN_DISCUSSION // 相談中
+  CONFIRMED // 変更確定
+  DECLINED // 見送り
 }
