@@ -3,7 +3,43 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { CheckType } from "@/app/generated/prisma/client";
 import { runAwarenessCheck, resolveAwarenessCheck, submitDialogue } from "@/app/actions/awareness";
+import { confirmDeparture, recordFollowupContact } from "@/app/actions/departures";
+import { requestReassignment, resolveReassignment } from "@/app/actions/reassignments";
 import { getClientPurchaseHistory } from "@/lib/product-reports";
+
+const visitIntervalLabel: Record<string, string> = {
+  WEEKLY: "週1回",
+  BIWEEKLY: "2週に1回",
+  TRIWEEKLY: "3週に1回",
+  MONTHLY: "月1回",
+  MAINTENANCE: "2ヶ月に1回(メンテナンス)",
+};
+
+const departureReasonLabel: Record<string, string> = {
+  GRADUATED: "症状改善による卒業(満足)",
+  TRIAL_ONLY: "お試し利用(元々継続意思なし)",
+  TEMPORARY_VISITOR: "遠方からの一時利用(帰省・出張等)",
+  SWITCHED_BRANCH: "砥部店(他店舗)へ変更",
+  NO_PERCEIVED_EFFECT: "効果を実感できなかった",
+  LIFE_CHANGE: "体調・環境の変化(妊娠・出産・病気・怪我等)",
+  STAFF_MINDSET_LACK: "こちら側のマインド不足",
+  OTHER: "その他",
+};
+
+const checkpointStageLabel: Record<string, string> = {
+  WEEK3: "3週後",
+  WEEK6: "6週後",
+  MONTH3: "3ヶ月後",
+  MONTH6: "6ヶ月後",
+  YEAR1: "1年後",
+};
+
+const followupResponseLabel: Record<string, string> = {
+  WILLING_TO_CONTINUE: "反応あり(継続の意思)",
+  NOT_CONTINUING: "反応あり(継続なし)",
+  NO_RESPONSE: "反応なし",
+  NOT_DONE: "未実施",
+};
 
 function fmtDate(d: Date | null) {
   return d ? d.toISOString().slice(0, 10) : "—";
@@ -37,11 +73,21 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         orderBy: { visitNo: "desc" },
         include: { staff: true, chartRecord: true, awarenessChecks: { include: { dialogue: { include: { authorStaff: true } } } } },
       },
+      departureRecords: {
+        orderBy: { confirmedAt: "desc" },
+        include: { confirmedBy: true, checkpoints: { orderBy: { scheduledDate: "asc" }, include: { contactedBy: true } } },
+      },
+      reassignmentRequests: {
+        orderBy: { createdAt: "desc" },
+        include: { currentStaff: true, newStaff: true, requestedByStaff: true },
+      },
     },
   });
   if (!client) notFound();
 
   const purchaseHistory = await getClientPurchaseHistory(client.id);
+  const allStaff = await prisma.staff.findMany({ where: { active: true }, orderBy: { name: "asc" } });
+  const openReassignment = client.reassignmentRequests.find((r) => r.status === "IN_DISCUSSION");
 
   const balance = client.prepaidCard
     ? client.prepaidCard.transactions.reduce((s, t) => s + t.amount, 0)
@@ -85,6 +131,14 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <Row label="主担当" value={client.primaryStaff?.name ?? "—"} />
             <Row label="初回来院" value={fmtDate(client.firstVisitDate)} />
             <Row label="来院回数" value={`${client.visits.length}回`} />
+            <Row
+              label="必要来院ペース"
+              value={
+                latestVisit?.chartRecord?.requiredVisitInterval
+                  ? visitIntervalLabel[latestVisit.chartRecord.requiredVisitInterval]
+                  : "未設定"
+              }
+            />
             {client.referrals.length > 0 && (
               <Row
                 label="紹介した人"
@@ -131,6 +185,151 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           </ul>
         </section>
       </div>
+
+      <section className="rounded-lg border border-stone-200 bg-white p-5">
+        <h2 className="font-semibold mb-3">離脱・担当変更</h2>
+
+        <div className="flex flex-wrap gap-4">
+          {client.isActive && (
+            <details className="flex-1 min-w-[280px]">
+              <summary className="cursor-pointer text-sm font-medium text-stone-700">離脱を記録する</summary>
+              <form action={confirmDeparture.bind(null, client.id)} className="mt-3 flex flex-col gap-3">
+                <Field label="離脱理由" required>
+                  <select name="reason" required className="input">
+                    <option value="">選択してください</option>
+                    {Object.entries(departureReasonLabel).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="補足メモ">
+                  <textarea name="reasonNote" rows={2} className="input" />
+                </Field>
+                <button type="submit" className="rounded-md bg-stone-800 px-3 py-1.5 text-sm font-medium text-white w-fit">
+                  離脱を記録する
+                </button>
+              </form>
+            </details>
+          )}
+
+          {!openReassignment && (
+            <details className="flex-1 min-w-[280px]">
+              <summary className="cursor-pointer text-sm font-medium text-stone-700">担当変更を相談する</summary>
+              <form action={requestReassignment.bind(null, client.id)} className="mt-3 flex flex-col gap-3">
+                <Field label="相談メモ">
+                  <textarea
+                    name="note"
+                    rows={2}
+                    className="input"
+                    placeholder="〇〇さんとの関わり、少し一人で抱え込んでいませんか?"
+                  />
+                </Field>
+                <button type="submit" className="rounded-md bg-stone-800 px-3 py-1.5 text-sm font-medium text-white w-fit">
+                  相談する
+                </button>
+              </form>
+            </details>
+          )}
+        </div>
+
+        {openReassignment && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50/40 p-3">
+            <p className="text-sm text-stone-800">
+              担当変更を相談中(現在の担当: {openReassignment.currentStaff.name}
+              {openReassignment.requestedByStaff && ` ・ 起票: ${openReassignment.requestedByStaff.name}`})
+            </p>
+            {openReassignment.note && <p className="mt-1 text-sm text-stone-600">{openReassignment.note}</p>}
+
+            <form action={resolveReassignment.bind(null, openReassignment.id, "confirm")} className="mt-3 flex flex-wrap items-end gap-2">
+              <Field label="新しい担当">
+                <select name="newStaffId" required className="input">
+                  <option value="">選択してください</option>
+                  {allStaff
+                    .filter((s) => s.id !== openReassignment.currentStaffId)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+              <Field label="引き継ぎメモ">
+                <input name="handoverNote" className="input" placeholder="何を伝えたか・注意点" />
+              </Field>
+              <button type="submit" className="rounded-md bg-emerald-800 px-3 py-1.5 text-sm font-medium text-white">
+                変更を確定する
+              </button>
+            </form>
+            <form action={resolveReassignment.bind(null, openReassignment.id, "decline")} className="mt-2">
+              <button type="submit" className="text-xs text-stone-400 hover:text-stone-600 underline">
+                今回は見送る
+              </button>
+            </form>
+          </div>
+        )}
+
+        {client.departureRecords.length > 0 && (
+          <div className="mt-4 flex flex-col gap-3">
+            {client.departureRecords.map((d) => (
+              <div key={d.id} className="rounded-md border border-stone-200 p-3">
+                <p className="text-sm text-stone-800">
+                  {fmtDate(d.confirmedAt)} ・ {d.reason ? departureReasonLabel[d.reason] : "理由未確定"}
+                  {d.triggeredByCancellation && (
+                    <span className="ml-2 rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500">キャンセル後未予約</span>
+                  )}
+                  <span className="ml-2 text-xs text-stone-400">記録: {d.confirmedBy.name}</span>
+                </p>
+                {d.reasonNote && <p className="mt-1 text-xs text-stone-600">{d.reasonNote}</p>}
+
+                <ul className="mt-2 flex flex-col divide-y divide-stone-100 border-t border-stone-100">
+                  {d.checkpoints.map((cp) => (
+                    <li key={cp.id} className="py-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span>
+                          {checkpointStageLabel[cp.stage]}(予定: {fmtDate(cp.scheduledDate)})
+                        </span>
+                        <span className="text-xs text-stone-500">
+                          {cp.status === "CONTACTED"
+                            ? `連絡済み ・ ${cp.response ? followupResponseLabel[cp.response] : ""}`
+                            : "未対応"}
+                        </span>
+                      </div>
+                      {cp.status === "CONTACTED" ? (
+                        cp.note && <p className="mt-1 text-xs text-stone-500">{cp.note}</p>
+                      ) : (
+                        <form action={recordFollowupContact.bind(null, cp.id)} className="mt-2 flex flex-wrap items-end gap-2">
+                          <select name="contactMethod" required className="input py-1 text-xs">
+                            <option value="">連絡方法</option>
+                            <option value="LINE">LINE</option>
+                            <option value="PHONE">電話</option>
+                            <option value="LETTER">手紙・はがき</option>
+                            <option value="IN_PERSON">対面(来店時)</option>
+                            <option value="OTHER">その他</option>
+                          </select>
+                          <select name="response" required className="input py-1 text-xs">
+                            <option value="">反応</option>
+                            {Object.entries(followupResponseLabel).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                          <input name="note" placeholder="メモ" className="input py-1 text-xs flex-1 min-w-[120px]" />
+                          <button type="submit" className="rounded-md bg-stone-800 px-2.5 py-1 text-xs text-white">
+                            記録する
+                          </button>
+                        </form>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {latestVisit && (
         <section className="rounded-lg border border-stone-200 bg-white p-5">
@@ -224,6 +423,18 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <dt className="text-stone-500">{label}</dt>
       <dd className="text-right text-stone-800">{value}</dd>
     </div>
+  );
+}
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="text-stone-600">
+        {label}
+        {required && <span className="text-rose-600"> *</span>}
+      </span>
+      {children}
+    </label>
   );
 }
 

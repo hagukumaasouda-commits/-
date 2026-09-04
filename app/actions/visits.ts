@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { VisitInterval } from "@/app/generated/prisma/client";
 
 export async function createVisit(clientId: string, formData: FormData) {
   const staffId = String(formData.get("staffId") || "");
@@ -16,6 +17,8 @@ export async function createVisit(clientId: string, formData: FormData) {
   const clientVoice = String(formData.get("clientVoice") || "") || null;
   const chiefComplaintTags = formData.getAll("chiefComplaintTags").map(String);
   const bodyPartTags = formData.getAll("bodyPartTags").map(String);
+  const requiredVisitIntervalRaw = String(formData.get("requiredVisitInterval") || "");
+  const requiredVisitInterval = requiredVisitIntervalRaw ? (requiredVisitIntervalRaw as VisitInterval) : null;
 
   const existingCount = await prisma.visit.count({ where: { clientId } });
   const visitNo = existingCount + 1;
@@ -40,6 +43,7 @@ export async function createVisit(clientId: string, formData: FormData) {
       nextCheck,
       nextRequired,
       clientVoice,
+      requiredVisitInterval,
     },
   });
 

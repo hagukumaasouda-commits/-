@@ -66,6 +66,17 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
           </Field>
         </div>
 
+        <Field label="必要来院ペース">
+          <select name="requiredVisitInterval" className="input" defaultValue="">
+            <option value="">未設定</option>
+            <option value="WEEKLY">週1回</option>
+            <option value="BIWEEKLY">2週に1回</option>
+            <option value="TRIWEEKLY">3週に1回</option>
+            <option value="MONTHLY">月1回</option>
+            <option value="MAINTENANCE">2ヶ月に1回(メンテナンス)</option>
+          </select>
+        </Field>
+
         <button type="submit" className="mt-2 rounded-md bg-emerald-800 px-4 py-2 text-sm font-medium text-white w-fit">
           カルテを保存する
         </button>
