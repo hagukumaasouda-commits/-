@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { ReservationStatus } from "@/app/generated/prisma/client";
+import { ReservationStatus, VisitInterval } from "@/app/generated/prisma/client";
 
 // 会議・週報で使う集計ロジック。すべて期間(ReportPeriod)を受け取り、
 // 「その期間にどうだったか」または「期間終了時点でどうか」を返す。
@@ -9,8 +9,20 @@ export type ReportPeriod = { start: Date; end: Date };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** 離脱判定・プリカ消化ペース検出のしきい値(6週間 = 42日)。要件どおり固定値。 */
+/** requiredVisitInterval が一度も記録されていない患者に使う離脱判定のフォールバックしきい値(6週間 = 42日)。 */
 export const CHURN_THRESHOLD_DAYS = 42;
+
+/** 必要来院ペースの日数換算(docs/departure-followup-spec-v2.md 2.1)。 */
+const VISIT_INTERVAL_DAYS: Record<VisitInterval, number> = {
+  WEEKLY: 7,
+  BIWEEKLY: 14,
+  TRIWEEKLY: 21,
+  MONTHLY: 30,
+  MAINTENANCE: 60,
+};
+
+/** 離脱候補判定の倍率。「必要来院ペースの何倍」来院がなければ離脱候補とするか(docs/departure-followup-spec-v2.md 2.2)。 */
+const CHURN_INTERVAL_MULTIPLIER = 3;
 
 /** 初回→2回目移行を計測する追跡ウィンドウ(8週間)。 */
 export const SECOND_VISIT_FOLLOWUP_DAYS = 56;
@@ -71,16 +83,33 @@ async function getClientsWithFutureReservation(asOf: Date) {
   return new Set(rows.map((r) => r.clientId));
 }
 
-/** 離脱扱いのクライアントID一覧(最終来院から6週間以上 かつ 未来の予約なし)。 */
+/** 全クライアントの「asOf時点で直近に記録された」requiredVisitInterval(null は除く)。 */
+async function getRequiredVisitIntervalsAsOf(asOf: Date) {
+  const rows = await prisma.visit.findMany({
+    where: { visitDate: { lte: asOf }, chartRecord: { requiredVisitInterval: { not: null } } },
+    select: { clientId: true, chartRecord: { select: { requiredVisitInterval: true } } },
+    orderBy: { visitDate: "desc" },
+    distinct: ["clientId"],
+  });
+  return new Map(rows.map((r) => [r.clientId, r.chartRecord!.requiredVisitInterval!]));
+}
+
+/** 離脱扱いのクライアントID一覧(最終来院から「必要来院ペース×3」以上経過 かつ 未来の予約なし)。 */
 export async function getChurnedClientIds(asOf: Date = new Date()): Promise<string[]> {
-  const [visitStats, futureReserved] = await Promise.all([
+  const [visitStats, futureReserved, requiredIntervals] = await Promise.all([
     getVisitStatsAsOf(asOf),
     getClientsWithFutureReservation(asOf),
+    getRequiredVisitIntervalsAsOf(asOf),
   ]);
-  const cutoff = asOf.getTime() - CHURN_THRESHOLD_DAYS * DAY_MS;
   const result: string[] = [];
   for (const [clientId, stats] of visitStats) {
-    if (stats.lastVisitDate.getTime() <= cutoff && !futureReserved.has(clientId)) {
+    if (futureReserved.has(clientId)) continue;
+    const interval = requiredIntervals.get(clientId);
+    const thresholdDays = interval
+      ? VISIT_INTERVAL_DAYS[interval] * CHURN_INTERVAL_MULTIPLIER
+      : CHURN_THRESHOLD_DAYS;
+    const cutoff = asOf.getTime() - thresholdDays * DAY_MS;
+    if (stats.lastVisitDate.getTime() <= cutoff) {
       result.push(clientId);
     }
   }

@@ -12,13 +12,13 @@ import { StaffRole } from "../app/generated/prisma/client";
 
 const username = process.env.STAFF_USERNAME;
 const password = process.env.STAFF_PASSWORD;
-const name = process.env.STAFF_NAME ?? username;
 const role = (process.env.STAFF_ROLE ?? "STAFF") as StaffRole;
 
 async function main() {
   if (!username || !password) {
     throw new Error("STAFF_USERNAME と STAFF_PASSWORD を環境変数で指定してください。");
   }
+  const name = process.env.STAFF_NAME ?? username;
   if (role !== StaffRole.STAFF && role !== StaffRole.DIRECTOR) {
     throw new Error("STAFF_ROLE は STAFF か DIRECTOR を指定してください。");
   }
