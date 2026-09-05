@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { VisitInterval } from "@/app/generated/prisma/client";
+import { VisitInterval, HealthHappinessScore } from "@/app/generated/prisma/client";
 import { LIFESTYLE_SUPPORT_ITEMS } from "@/lib/tags";
 
 export async function createVisit(clientId: string, formData: FormData) {
@@ -25,6 +25,17 @@ export async function createVisit(clientId: string, formData: FormData) {
   const lifestyleSupportStatus = Object.fromEntries(
     LIFESTYLE_SUPPORT_ITEMS.map((item) => [item, checkedLifestyleItems.has(item)])
   );
+  const healthHappinessScoreRaw = String(formData.get("healthHappinessScore") || "");
+  const healthHappinessScore = healthHappinessScoreRaw ? (healthHappinessScoreRaw as HealthHappinessScore) : null;
+
+  const testimonialObtained = formData.get("testimonialObtained") === "true";
+  const testimonialObtainedDateRaw = String(formData.get("testimonialObtainedDate") || "");
+  const testimonialObtainedDate =
+    testimonialObtained && testimonialObtainedDateRaw ? new Date(testimonialObtainedDateRaw) : null;
+
+  const referralGiven = formData.get("referralGiven") === "true";
+  const referralCountRaw = String(formData.get("referralCount") || "");
+  const referralCount = referralGiven ? Number(referralCountRaw) || 1 : null;
 
   const existingCount = await prisma.visit.count({ where: { clientId } });
   const visitNo = existingCount + 1;
@@ -52,6 +63,11 @@ export async function createVisit(clientId: string, formData: FormData) {
       requiredVisitInterval,
       lifestyleSupportStatus,
       healthPracticeNote,
+      healthHappinessScore,
+      testimonialObtained,
+      testimonialObtainedDate,
+      referralGiven,
+      referralCount,
     },
   });
 

@@ -99,15 +99,53 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
           </Field>
         </div>
 
-        <Field label="必要来院ペース">
-          <select name="requiredVisitInterval" className="input" defaultValue="">
-            <option value="">未設定</option>
-            <option value="WEEKLY">週1回</option>
-            <option value="BIWEEKLY">2週に1回</option>
-            <option value="TRIWEEKLY">3週に1回</option>
-            <option value="MONTHLY">月1回</option>
-            <option value="MAINTENANCE">2ヶ月に1回(メンテナンス)</option>
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="必要来院ペース">
+            <select name="requiredVisitInterval" className="input" defaultValue="">
+              <option value="">未設定</option>
+              <option value="TWICE_OR_THRICE_WEEKLY">週2,3回</option>
+              <option value="WEEK1">1週間</option>
+              <option value="DAY10">10日</option>
+              <option value="WEEK2">2週間</option>
+              <option value="WEEK3">3週間</option>
+              <option value="WEEK4">4週間</option>
+              <option value="MONTH2">2か月</option>
+              <option value="MONTH3">3か月</option>
+            </select>
+          </Field>
+          <Field label="回復度(健康度幸福度)">
+            <select name="healthHappinessScore" className="input" defaultValue="">
+              <option value="">未設定</option>
+              <option value="ABOVE_80">80%以上</option>
+              <option value="PCT_70">70%</option>
+              <option value="PCT_60">60%</option>
+              <option value="PCT_55">55%</option>
+              <option value="PCT_50">50%</option>
+              <option value="PCT_40">40%</option>
+              <option value="BELOW_40">40%以下</option>
+            </select>
+          </Field>
+        </div>
+
+        <Field label="口コミ・紹介">
+          <div className="flex flex-col gap-2 rounded-md border border-stone-200 bg-stone-50 p-3">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-stone-700">
+              <input type="checkbox" id="testimonialObtained" name="testimonialObtained" value="true" className="peer accent-emerald-800" />
+              <label htmlFor="testimonialObtained">口コミを取得した</label>
+              <span className="hidden items-center gap-1.5 text-stone-500 peer-checked:flex">
+                取得日:
+                <input type="date" name="testimonialObtainedDate" className="input py-1" />
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-stone-700">
+              <input type="checkbox" id="referralGiven" name="referralGiven" value="true" className="peer accent-emerald-800" />
+              <label htmlFor="referralGiven">紹介をしてくれた</label>
+              <span className="hidden items-center gap-1.5 text-stone-500 peer-checked:flex">
+                人数:
+                <input type="number" name="referralCount" min={1} defaultValue={1} className="input py-1 w-20" />
+              </span>
+            </div>
+          </div>
         </Field>
 
         <button type="submit" className="mt-2 rounded-md bg-emerald-800 px-4 py-2 text-sm font-medium text-white w-fit">

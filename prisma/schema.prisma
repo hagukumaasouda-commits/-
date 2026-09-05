@@ -164,15 +164,35 @@ model ChartRecord {
   lifestyleSupportStatus Json? // 生活習慣サポート実施状況(てる1〜Bトレ等、社内略称キーの済/未マップ。lib/tags.ts の LIFESTYLE_SUPPORT_ITEMS)
   healthPracticeNote     String? // 健康実践状況(自由記述。来院ごとに記録し、タイムラインで時系列に蓄積する)
 
+  healthHappinessScore HealthHappinessScore? // 回復度(健康度幸福度)。任意項目、最新値を顧客詳細ページに表示
+
+  testimonialObtained     Boolean   @default(false) // 口コミを取得したか
+  testimonialObtainedDate DateTime? // 取得日(任意)
+  referralGiven           Boolean   @default(false) // 紹介をしてくれたか
+  referralCount           Int? // 紹介人数(任意。未入力時はreferralGiven=trueなら1として扱う)
+
   createdAt DateTime @default(now())
 }
 
 enum VisitInterval {
-  WEEKLY // 週1回 = 7日
-  BIWEEKLY // 2週に1回 = 14日
-  TRIWEEKLY // 3週に1回 = 21日
-  MONTHLY // 月1回 = 30日
-  MAINTENANCE // 2ヶ月に1回(メンテナンス) = 60日
+  TWICE_OR_THRICE_WEEKLY // 週2,3回 = 3日
+  WEEK1 // 1週間 = 7日
+  DAY10 // 10日 = 10日
+  WEEK2 // 2週間 = 14日
+  WEEK3 // 3週間 = 21日
+  WEEK4 // 4週間 = 28日
+  MONTH2 // 2か月 = 60日
+  MONTH3 // 3か月 = 90日
+}
+
+enum HealthHappinessScore {
+  ABOVE_80 // 80%以上
+  PCT_70 // 70%
+  PCT_60 // 60%
+  PCT_55 // 55%
+  PCT_50 // 50%
+  PCT_40 // 40%
+  BELOW_40 // 40%以下
 }
 
 // ---------------------------------------------------------------------------

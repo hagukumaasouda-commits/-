@@ -10,11 +10,24 @@ import { recordProductSale } from "@/app/actions/products";
 import { getClientPurchaseHistory } from "@/lib/product-reports";
 
 const visitIntervalLabel: Record<string, string> = {
-  WEEKLY: "週1回",
-  BIWEEKLY: "2週に1回",
-  TRIWEEKLY: "3週に1回",
-  MONTHLY: "月1回",
-  MAINTENANCE: "2ヶ月に1回(メンテナンス)",
+  TWICE_OR_THRICE_WEEKLY: "週2,3回",
+  WEEK1: "1週間",
+  DAY10: "10日",
+  WEEK2: "2週間",
+  WEEK3: "3週間",
+  WEEK4: "4週間",
+  MONTH2: "2か月",
+  MONTH3: "3か月",
+};
+
+const healthHappinessScoreLabel: Record<string, string> = {
+  ABOVE_80: "80%以上",
+  PCT_70: "70%",
+  PCT_60: "60%",
+  PCT_55: "55%",
+  PCT_50: "50%",
+  PCT_40: "40%",
+  BELOW_40: "40%以下",
 };
 
 const departureReasonLabel: Record<string, string> = {
@@ -151,6 +164,14 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               value={
                 latestVisit?.chartRecord?.requiredVisitInterval
                   ? visitIntervalLabel[latestVisit.chartRecord.requiredVisitInterval]
+                  : "未設定"
+              }
+            />
+            <Row
+              label="回復度"
+              value={
+                latestVisit?.chartRecord?.healthHappinessScore
+                  ? healthHappinessScoreLabel[latestVisit.chartRecord.healthHappinessScore]
                   : "未設定"
               }
             />
@@ -567,6 +588,16 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                           .join("、") || "実施項目なし"}
                       </p>
                     )}
+                    {v.chartRecord.healthHappinessScore && (
+                      <p>回復度: {healthHappinessScoreLabel[v.chartRecord.healthHappinessScore]}</p>
+                    )}
+                    {v.chartRecord.testimonialObtained && (
+                      <p>
+                        口コミ取得
+                        {v.chartRecord.testimonialObtainedDate && `(${fmtDate(v.chartRecord.testimonialObtainedDate)})`}
+                      </p>
+                    )}
+                    {v.chartRecord.referralGiven && <p>紹介あり({v.chartRecord.referralCount ?? 1}人)</p>}
                   </div>
                 )}
               </details>

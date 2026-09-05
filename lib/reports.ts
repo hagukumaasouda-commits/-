@@ -12,13 +12,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** requiredVisitInterval が一度も記録されていない患者に使う離脱判定のフォールバックしきい値(6週間 = 42日)。 */
 export const CHURN_THRESHOLD_DAYS = 42;
 
-/** 必要来院ペースの日数換算(docs/departure-followup-spec-v2.md 2.1)。 */
+/** 必要来院ペースの日数換算(docs/departure-followup-spec-v2.md 2.1、v3で8段階に更新)。 */
 const VISIT_INTERVAL_DAYS: Record<VisitInterval, number> = {
-  WEEKLY: 7,
-  BIWEEKLY: 14,
-  TRIWEEKLY: 21,
-  MONTHLY: 30,
-  MAINTENANCE: 60,
+  TWICE_OR_THRICE_WEEKLY: 3,
+  WEEK1: 7,
+  DAY10: 10,
+  WEEK2: 14,
+  WEEK3: 21,
+  WEEK4: 28,
+  MONTH2: 60,
+  MONTH3: 90,
 };
 
 /** 離脱候補判定の倍率。「必要来院ペースの何倍」来院がなければ離脱候補とするか(docs/departure-followup-spec-v2.md 2.2)。 */
