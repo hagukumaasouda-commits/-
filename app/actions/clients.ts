@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { ClientRank } from "@/app/generated/prisma/client";
 
 export async function createClient(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
@@ -11,6 +12,7 @@ export async function createClient(formData: FormData) {
   const referredById = String(formData.get("referredById") || "") || null;
   const primaryStaffId = String(formData.get("primaryStaffId") || "") || null;
   const firstVisitDateRaw = String(formData.get("firstVisitDate") || "");
+  const rankRaw = String(formData.get("rank") || "");
 
   const client = await prisma.client.create({
     data: {
@@ -23,6 +25,7 @@ export async function createClient(formData: FormData) {
       referredById,
       primaryStaffId,
       firstVisitDate: firstVisitDateRaw ? new Date(firstVisitDateRaw) : null,
+      rank: rankRaw ? (rankRaw as ClientRank) : null,
     },
   });
 
@@ -42,6 +45,7 @@ export async function updateClient(clientId: string, formData: FormData) {
   const acquisitionChannelId = String(formData.get("acquisitionChannelId") || "") || null;
   const referredById = String(formData.get("referredById") || "") || null;
   const primaryStaffId = String(formData.get("primaryStaffId") || "") || null;
+  const rankRaw = String(formData.get("rank") || "");
 
   await prisma.client.update({
     where: { id: clientId },
@@ -61,6 +65,7 @@ export async function updateClient(clientId: string, formData: FormData) {
       firstVisitDate: firstVisitDateRaw ? new Date(firstVisitDateRaw) : null,
       medicalHistory: String(formData.get("medicalHistory") || "") || null,
       familyData: String(formData.get("familyData") || "") || null,
+      rank: rankRaw ? (rankRaw as ClientRank) : null,
     },
   });
 

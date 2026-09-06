@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { updateClient } from "@/app/actions/clients";
 import { notFound } from "next/navigation";
+import { RANK_OPTIONS } from "@/lib/tags";
 
 export default async function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -85,6 +86,16 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
             {staff.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="ランク">
+          <select name="rank" defaultValue={client.rank ?? ""} className="input">
+            <option value="">未選択</option>
+            {RANK_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>

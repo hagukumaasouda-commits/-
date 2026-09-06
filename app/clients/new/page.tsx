@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/app/actions/clients";
+import { RANK_OPTIONS } from "@/lib/tags";
 
 export default async function NewClientPage() {
   const [channels, staff, clients] = await Promise.all([
@@ -61,6 +62,16 @@ export default async function NewClientPage() {
             {staff.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="ランク">
+          <select name="rank" className="input" defaultValue="">
+            <option value="">未選択</option>
+            {RANK_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>
