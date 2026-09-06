@@ -1,4 +1,4 @@
-import { VisitInterval, HealthHappinessScore } from "@/app/generated/prisma/client";
+import { VisitInterval, HealthHappinessScore, ClientRank } from "@/app/generated/prisma/client";
 
 // カルテのタグ選択肢。集計(来院理由・部位別分布)の粒度をここで揃える。
 export const CHIEF_COMPLAINT_TAGS = [
@@ -75,6 +75,16 @@ export const HEALTH_HAPPINESS_OPTIONS: { value: HealthHappinessScore; label: str
 export const HEALTH_HAPPINESS_LABEL: Record<HealthHappinessScore, string> = Object.fromEntries(
   HEALTH_HAPPINESS_OPTIONS.map((o) => [o.value, o.label])
 ) as Record<HealthHappinessScore, string>;
+
+// 顧客ランク。顧客登録・編集画面、および来院記録フォームの両方から更新できる(現状値のみ保持)。
+export const RANK_OPTIONS: { value: ClientRank; label: string }[] = [
+  { value: "AS", label: "AS" },
+  { value: "A", label: "A" },
+  { value: "B", label: "B" },
+  { value: "C1", label: "C1" },
+  { value: "C2", label: "C2" },
+  { value: "C3", label: "C3" },
+];
 
 // 生活習慣サポート実施状況(初回カルテVer1.0の項目をそのまま踏襲。社内略称のまま表示する)。
 export const LIFESTYLE_SUPPORT_ITEMS = [
