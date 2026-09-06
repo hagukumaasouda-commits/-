@@ -1,6 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { createVisit } from "@/app/actions/visits";
-import { CHIEF_COMPLAINT_TAGS, BODY_PART_TAGS, LIFESTYLE_SUPPORT_ITEMS, TREATMENT_MENU } from "@/lib/tags";
+import {
+  CHIEF_COMPLAINT_TAGS,
+  BODY_PART_TAGS,
+  LIFESTYLE_SUPPORT_ITEMS,
+  TREATMENT_MENU,
+  VISIT_INTERVAL_OPTIONS,
+  HEALTH_HAPPINESS_OPTIONS,
+} from "@/lib/tags";
 import { notFound } from "next/navigation";
 
 export default async function NewVisitPage({ params }: { params: Promise<{ id: string }> }) {
@@ -103,26 +110,21 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
           <Field label="必要来院ペース">
             <select name="requiredVisitInterval" className="input" defaultValue="">
               <option value="">未設定</option>
-              <option value="TWICE_OR_THRICE_WEEKLY">週2,3回</option>
-              <option value="WEEK1">1週間</option>
-              <option value="DAY10">10日</option>
-              <option value="WEEK2">2週間</option>
-              <option value="WEEK3">3週間</option>
-              <option value="WEEK4">4週間</option>
-              <option value="MONTH2">2か月</option>
-              <option value="MONTH3">3か月</option>
+              {VISIT_INTERVAL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="回復度(健康度幸福度)">
             <select name="healthHappinessScore" className="input" defaultValue="">
               <option value="">未設定</option>
-              <option value="ABOVE_80">80%以上</option>
-              <option value="PCT_70">70%</option>
-              <option value="PCT_60">60%</option>
-              <option value="PCT_55">55%</option>
-              <option value="PCT_50">50%</option>
-              <option value="PCT_40">40%</option>
-              <option value="BELOW_40">40%以下</option>
+              {HEALTH_HAPPINESS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           </Field>
         </div>

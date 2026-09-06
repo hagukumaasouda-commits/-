@@ -8,27 +8,7 @@ import { requestReassignment, resolveReassignment } from "@/app/actions/reassign
 import { recordPrepaidTransaction } from "@/app/actions/prepaid";
 import { recordProductSale } from "@/app/actions/products";
 import { getClientPurchaseHistory } from "@/lib/product-reports";
-
-const visitIntervalLabel: Record<string, string> = {
-  TWICE_OR_THRICE_WEEKLY: "週2,3回",
-  WEEK1: "1週間",
-  DAY10: "10日",
-  WEEK2: "2週間",
-  WEEK3: "3週間",
-  WEEK4: "4週間",
-  MONTH2: "2か月",
-  MONTH3: "3か月",
-};
-
-const healthHappinessScoreLabel: Record<string, string> = {
-  ABOVE_80: "80%以上",
-  PCT_70: "70%",
-  PCT_60: "60%",
-  PCT_55: "55%",
-  PCT_50: "50%",
-  PCT_40: "40%",
-  BELOW_40: "40%以下",
-};
+import { VISIT_INTERVAL_LABEL as visitIntervalLabel, HEALTH_HAPPINESS_LABEL as healthHappinessScoreLabel } from "@/lib/tags";
 
 const departureReasonLabel: Record<string, string> = {
   GRADUATED: "症状改善による卒業(満足)",
