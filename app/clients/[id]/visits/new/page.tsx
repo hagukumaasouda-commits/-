@@ -143,6 +143,11 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
           </Field>
         </div>
 
+        <label className="flex items-center gap-1.5 text-sm text-stone-700">
+          <input type="checkbox" name="isManualReturnFlag" value="true" className="accent-emerald-800" />
+          この来院は離脱からの復帰(再診)です
+        </label>
+
         <Field label="口コミ・紹介">
           <div className="flex flex-col gap-2 rounded-md border border-stone-200 bg-stone-50 p-3">
             <div className="flex flex-wrap items-center gap-2 text-sm text-stone-700">

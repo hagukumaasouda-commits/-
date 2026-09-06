@@ -129,6 +129,7 @@ async function main() {
   const yamada = await prisma.client.create({
     data: {
       name: "山田 花子",
+      registrationType: "NEW",
       kana: "ヤマダ ハナコ",
       gender: "女",
       phone: "090-0000-0001",
@@ -168,6 +169,7 @@ async function main() {
   const tanaka = await prisma.client.create({
     data: {
       name: "田中 太郎",
+      registrationType: "NEW",
       kana: "タナカ タロウ",
       gender: "男",
       phone: "090-0000-0002",
@@ -192,10 +194,12 @@ async function main() {
   const sasaki = await prisma.client.create({
     data: {
       name: "佐々木 恵美",
+      registrationType: "NEW",
       kana: "ササキ エミ",
       gender: "女",
       acquisitionChannelId: channels["ご紹介"].id,
-      referredById: yamada.id,
+      referralSourceType: "EXISTING_CLIENT",
+      referralSourceClientId: yamada.id,
       primaryStaffId: staffSato.id,
       firstVisitDate: daysAgo(50),
     },
@@ -216,6 +220,7 @@ async function main() {
   const takahashi = await prisma.client.create({
     data: {
       name: "高橋 純一",
+      registrationType: "NEW",
       kana: "タカハシ ジュンイチ",
       gender: "男",
       acquisitionChannelId: channels["ホームページ"].id,
@@ -239,6 +244,7 @@ async function main() {
   const nakamura = await prisma.client.create({
     data: {
       name: "中村 あすか",
+      registrationType: "NEW",
       kana: "ナカムラ アスカ",
       gender: "女",
       acquisitionChannelId: channels["インスタグラム・SNS"].id,
@@ -261,6 +267,7 @@ async function main() {
   const kobayashi = await prisma.client.create({
     data: {
       name: "小林 誠",
+      registrationType: "NEW",
       kana: "コバヤシ マコト",
       gender: "男",
       acquisitionChannelId: channels["ホットペッパービューティー"].id,
@@ -293,10 +300,12 @@ async function main() {
   const watanabe = await prisma.client.create({
     data: {
       name: "渡辺 由紀",
+      registrationType: "NEW",
       kana: "ワタナベ ユキ",
       gender: "女",
       acquisitionChannelId: channels["ご紹介"].id,
-      referredById: tanaka.id,
+      referralSourceType: "EXISTING_CLIENT",
+      referralSourceClientId: tanaka.id,
       primaryStaffId: staffSuzuki.id,
       firstVisitDate: daysAgo(10),
     },
@@ -317,6 +326,7 @@ async function main() {
   const ito = await prisma.client.create({
     data: {
       name: "伊藤 誠一",
+      registrationType: "NEW",
       kana: "イトウ セイイチ",
       gender: "男",
       acquisitionChannelId: channels["その他"].id,

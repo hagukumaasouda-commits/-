@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { ReservationStatus, VisitInterval } from "@/app/generated/prisma/client";
+import { ReservationStatus, VisitInterval, RegistrationType } from "@/app/generated/prisma/client";
 
 // 会議・週報で使う集計ロジック。すべて期間(ReportPeriod)を受け取り、
 // 「その期間にどうだったか」または「期間終了時点でどうか」を返す。
@@ -119,10 +119,10 @@ export async function getChurnedClientIds(asOf: Date = new Date()): Promise<stri
   return result;
 }
 
-/** 1. 新規来院数: 期間内に初回来店した人数 */
+/** 1. 新規来院数: 期間内に初回来店した人数(真の新患のみ。既存患者のデータ移行は含めない) */
 export async function countNewVisits(period: ReportPeriod) {
   return prisma.client.count({
-    where: { firstVisitDate: { gte: period.start, lte: period.end } },
+    where: { firstVisitDate: { gte: period.start, lte: period.end }, registrationType: RegistrationType.NEW },
   });
 }
 
@@ -177,12 +177,12 @@ export async function getChannelBreakdown(period: ReportPeriod) {
     .sort((a, b) => b.clientCount - a.clientCount);
 }
 
-type Cohort = { id: string; firstVisitDate: Date | null; referredById: string | null }[];
+type Cohort = { id: string; firstVisitDate: Date | null; referralSourceClientId: string | null }[];
 
 async function getNewClientCohort(period: ReportPeriod): Promise<Cohort> {
   return prisma.client.findMany({
     where: { firstVisitDate: { gte: period.start, lte: period.end } },
-    select: { id: true, firstVisitDate: true, referredById: true },
+    select: { id: true, firstVisitDate: true, referralSourceClientId: true },
   });
 }
 
@@ -211,7 +211,7 @@ export async function getSecondVisitConversionRate(period: ReportPeriod) {
 /** 8. 紹介経由新規人数・紹介率(期間内新規のうち) */
 export async function getReferralStats(period: ReportPeriod) {
   const cohort = await getNewClientCohort(period);
-  const referred = cohort.filter((c) => c.referredById).length;
+  const referred = cohort.filter((c) => c.referralSourceClientId).length;
   return {
     cohortSize: cohort.length,
     referred,
@@ -319,6 +319,50 @@ export async function getComplaintAndBodyPartDistribution(period: ReportPeriod) 
   };
 }
 
+/**
+ * 13. 再診数(離脱後の復帰、docs/referral-source-registration-type-spec-v2.md)。
+ * 期間内に作成された来院記録のうち、以下いずれかを満たすものを1件としてカウントする(重複カウントはしない)。
+ *   (A) その顧客のdepartureRecordのうち、confirmedAtより後で初めての来院である(離脱記録ごとに1回まで)
+ *   (B) その来院のChartRecord.isManualReturnFlagがtrue
+ */
+export async function countReturnVisits(period: ReportPeriod): Promise<number> {
+  const countedVisitIds = new Set<string>();
+
+  const departures = await prisma.departureRecord.findMany({
+    select: { clientId: true, confirmedAt: true },
+  });
+  if (departures.length > 0) {
+    const clientIds = Array.from(new Set(departures.map((d) => d.clientId)));
+    const visits = await prisma.visit.findMany({
+      where: { clientId: { in: clientIds } },
+      select: { id: true, clientId: true, visitDate: true },
+      orderBy: { visitDate: "asc" },
+    });
+    const visitsByClient = new Map<string, { id: string; visitDate: Date }[]>();
+    for (const v of visits) {
+      const list = visitsByClient.get(v.clientId);
+      if (list) list.push(v);
+      else visitsByClient.set(v.clientId, [v]);
+    }
+    for (const d of departures) {
+      const firstAfter = (visitsByClient.get(d.clientId) ?? []).find(
+        (v) => v.visitDate.getTime() > d.confirmedAt.getTime()
+      );
+      if (firstAfter && firstAfter.visitDate >= period.start && firstAfter.visitDate <= period.end) {
+        countedVisitIds.add(firstAfter.id);
+      }
+    }
+  }
+
+  const manualFlagged = await prisma.visit.findMany({
+    where: { visitDate: { gte: period.start, lte: period.end }, chartRecord: { isManualReturnFlag: true } },
+    select: { id: true },
+  });
+  for (const v of manualFlagged) countedVisitIds.add(v.id);
+
+  return countedVisitIds.size;
+}
+
 /** ダッシュボード用: 12指標をまとめて取得する。 */
 export async function getDashboardReport(period: ReportPeriod) {
   const [
@@ -334,6 +378,7 @@ export async function getDashboardReport(period: ReportPeriod) {
     staffRepeatRate,
     prepaidDrain,
     distribution,
+    returnVisits,
   ] = await Promise.all([
     countNewVisits(period),
     countChurned(period),
@@ -347,6 +392,7 @@ export async function getDashboardReport(period: ReportPeriod) {
     getStaffRepeatRate(period),
     getPrepaidDrainWithoutVisit(period),
     getComplaintAndBodyPartDistribution(period),
+    countReturnVisits(period),
   ]);
 
   return {
@@ -363,6 +409,7 @@ export async function getDashboardReport(period: ReportPeriod) {
     staffRepeatRate,
     prepaidDrain,
     distribution,
+    returnVisits,
   };
 }
 

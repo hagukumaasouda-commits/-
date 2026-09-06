@@ -13,6 +13,38 @@ export default async function NewClientPage() {
     <div className="max-w-xl">
       <h1 className="text-xl font-semibold text-stone-900 mb-6">新規顧客登録</h1>
       <form action={createClient} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1 text-sm">
+          <span className="text-stone-600">
+            登録区分<span className="text-rose-600"> *</span>
+          </span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-stone-200 bg-stone-50 p-3">
+            <input
+              type="radio"
+              id="regTypeNew"
+              name="registrationType"
+              value="NEW"
+              required
+              defaultChecked
+              className="peer/new accent-emerald-800"
+            />
+            <label htmlFor="regTypeNew">新規</label>
+            <input
+              type="radio"
+              id="regTypeExisting"
+              name="registrationType"
+              value="EXISTING"
+              required
+              className="peer/existing accent-emerald-800"
+            />
+            <label htmlFor="regTypeExisting">既存(データ移行)</label>
+
+            <div className="hidden w-full flex-col gap-1 peer-checked/existing:flex">
+              <span className="text-xs text-stone-500">来院回数(これまでの実績)</span>
+              <input type="number" name="initialVisitCount" min={0} step={1} defaultValue={0} className="input" />
+            </div>
+          </div>
+        </div>
+
         <Field label="氏名" required>
           <input name="name" required className="input" />
         </Field>
@@ -46,16 +78,53 @@ export default async function NewClientPage() {
             ))}
           </select>
         </Field>
-        <Field label="紹介元(誰の紹介か)">
-          <select name="referredById" className="input">
-            <option value="">なし</option>
+
+        <div className="flex flex-col gap-1 text-sm">
+          <span className="text-stone-600">紹介元(誰の紹介か)</span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-stone-200 bg-stone-50 p-3">
+            <input
+              type="radio"
+              id="refSrcExisting"
+              name="referralSourceType"
+              value="EXISTING_CLIENT"
+              className="peer/existing accent-emerald-800"
+            />
+            <label htmlFor="refSrcExisting">既存患者</label>
+            <input type="radio" id="refSrcStaff" name="referralSourceType" value="STAFF" className="peer/staff accent-emerald-800" />
+            <label htmlFor="refSrcStaff">スタッフ</label>
+            <input type="radio" id="refSrcOther" name="referralSourceType" value="OTHER" className="peer/other accent-emerald-800" />
+            <label htmlFor="refSrcOther">その他</label>
+
+            <input
+              type="text"
+              list="referral-client-options"
+              name="referralSourceClientQuery"
+              placeholder="氏名を入力して選択"
+              autoComplete="off"
+              className="input hidden w-full peer-checked/existing:block"
+            />
+            <select name="referralSourceStaffId" className="input hidden w-full peer-checked/staff:block">
+              <option value="">選択してください</option>
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              name="referralSourceNote"
+              placeholder="自由記述"
+              className="input hidden w-full peer-checked/other:block"
+            />
+          </div>
+          <datalist id="referral-client-options">
             {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
+              <option key={c.id} value={`${c.name} #${c.id}`} />
             ))}
-          </select>
-        </Field>
+          </datalist>
+        </div>
+
         <Field label="主担当スタッフ">
           <select name="primaryStaffId" className="input">
             <option value="">未選択</option>
@@ -75,10 +144,6 @@ export default async function NewClientPage() {
               </option>
             ))}
           </select>
-        </Field>
-        <Field label="来院回数(これまでの実績)">
-          <input type="number" name="initialVisitCount" min={0} step={1} defaultValue={0} className="input" />
-          <span className="text-xs text-stone-400">真の新患は0のまま。既存患者を登録する場合はこれまでの来院回数を入力</span>
         </Field>
         <Field label="個人データ">
           <textarea name="personalData" rows={3} className="input" />

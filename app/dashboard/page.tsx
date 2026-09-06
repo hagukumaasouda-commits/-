@@ -68,6 +68,7 @@ export default async function DashboardPage({
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         <StatCard label="新規来院数" value={report.newVisits} />
         <StatCard label="離脱数(6週間以上・予約なし)" value={report.churned} tone={report.churned > 0 ? "warn" : "default"} />
+        <StatCard label="再診数(離脱後の復帰)" value={report.returnVisits} />
         <StatCard label="6回以上リピーター" value={report.repeaters6plus} />
         <StatCard label="15回以上リピーター" value={report.repeaters15plus} />
         <StatCard label="初回→2回目移行率" value={fmtPct(report.secondVisitConversion.rate)} sub={`${report.secondVisitConversion.converted}/${report.secondVisitConversion.cohortSize}人`} />

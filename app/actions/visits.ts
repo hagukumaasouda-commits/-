@@ -47,6 +47,8 @@ export async function createVisit(clientId: string, formData: FormData) {
     TREATMENT_MODALITY_ITEMS.map((item) => [item, checkedModalities.has(item)])
   );
 
+  const isManualReturnFlag = formData.get("isManualReturnFlag") === "true";
+
   const existingCount = await prisma.visit.count({ where: { clientId } });
   const visitNo = existingCount + 1;
 
@@ -80,17 +82,19 @@ export async function createVisit(clientId: string, formData: FormData) {
       referralCount,
       menuPlan,
       treatmentModalities,
+      isManualReturnFlag,
     },
   });
 
-  if (visitNo === 1) {
-    await prisma.client.update({
-      where: { id: clientId },
-      data: { firstVisitDate: new Date(visitDateRaw), isActive: true, rank },
-    });
-  } else {
-    await prisma.client.update({ where: { id: clientId }, data: { isActive: true, rank } });
-  }
+  await prisma.client.update({
+    where: { id: clientId },
+    data: {
+      isActive: true,
+      rank,
+      ...(visitNo === 1 ? { firstVisitDate: new Date(visitDateRaw) } : {}),
+      ...(referralGiven ? { referralCount: { increment: referralCount ?? 1 } } : {}),
+    },
+  });
 
   redirect(`/clients/${clientId}`);
 }

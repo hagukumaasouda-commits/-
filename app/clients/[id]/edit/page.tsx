@@ -15,6 +15,9 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   if (!client) notFound();
 
   const action = updateClient.bind(null, client.id);
+  const referralSourceClientName = client.referralSourceClientId
+    ? (clients.find((c) => c.id === client.referralSourceClientId)?.name ?? null)
+    : null;
 
   return (
     <div className="max-w-xl">
@@ -70,16 +73,72 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
             ))}
           </select>
         </Field>
-        <Field label="紹介元(誰の紹介か)">
-          <select name="referredById" defaultValue={client.referredById ?? ""} className="input">
-            <option value="">なし</option>
+        <div className="flex flex-col gap-1 text-sm">
+          <span className="text-stone-600">紹介元(誰の紹介か)</span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-stone-200 bg-stone-50 p-3">
+            <input
+              type="radio"
+              id="refSrcExisting"
+              name="referralSourceType"
+              value="EXISTING_CLIENT"
+              defaultChecked={client.referralSourceType === "EXISTING_CLIENT"}
+              className="peer/existing accent-emerald-800"
+            />
+            <label htmlFor="refSrcExisting">既存患者</label>
+            <input
+              type="radio"
+              id="refSrcStaff"
+              name="referralSourceType"
+              value="STAFF"
+              defaultChecked={client.referralSourceType === "STAFF"}
+              className="peer/staff accent-emerald-800"
+            />
+            <label htmlFor="refSrcStaff">スタッフ</label>
+            <input
+              type="radio"
+              id="refSrcOther"
+              name="referralSourceType"
+              value="OTHER"
+              defaultChecked={client.referralSourceType === "OTHER"}
+              className="peer/other accent-emerald-800"
+            />
+            <label htmlFor="refSrcOther">その他</label>
+
+            <input
+              type="text"
+              list="referral-client-options"
+              name="referralSourceClientQuery"
+              placeholder="氏名を入力して選択"
+              autoComplete="off"
+              defaultValue={referralSourceClientName ? `${referralSourceClientName} #${client.referralSourceClientId}` : ""}
+              className="input hidden w-full peer-checked/existing:block"
+            />
+            <select
+              name="referralSourceStaffId"
+              defaultValue={client.referralSourceStaffId ?? ""}
+              className="input hidden w-full peer-checked/staff:block"
+            >
+              <option value="">選択してください</option>
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              name="referralSourceNote"
+              placeholder="自由記述"
+              defaultValue={client.referralSourceNote ?? ""}
+              className="input hidden w-full peer-checked/other:block"
+            />
+          </div>
+          <datalist id="referral-client-options">
             {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
+              <option key={c.id} value={`${c.name} #${c.id}`} />
             ))}
-          </select>
-        </Field>
+          </datalist>
+        </div>
         <Field label="主担当スタッフ">
           <select name="primaryStaffId" defaultValue={client.primaryStaffId ?? ""} className="input">
             <option value="">未選択</option>

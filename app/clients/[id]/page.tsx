@@ -64,7 +64,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     include: {
       primaryStaff: true,
       acquisitionChannel: true,
-      referredBy: { select: { id: true, name: true } },
+      referralSourceClient: { select: { id: true, name: true } },
+      referralSourceStaff: { select: { id: true, name: true } },
       referrals: { select: { id: true, name: true } },
       prepaidCard: { include: { transactions: { orderBy: { txDate: "desc" }, take: 10, include: { staff: true } } } },
       treatmentCourses: { orderBy: { courseNo: "desc" } },
@@ -170,11 +171,25 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <Row label="来店きっかけ" value={client.acquisitionChannel?.name ?? "—"} />
             <Row
               label="紹介元"
-              value={client.referredBy ? <Link href={`/clients/${client.referredBy.id}`} className="text-emerald-800 underline">{client.referredBy.name}</Link> : "—"}
+              value={
+                client.referralSourceType === "EXISTING_CLIENT" && client.referralSourceClient ? (
+                  <Link href={`/clients/${client.referralSourceClient.id}`} className="text-emerald-800 underline">
+                    {client.referralSourceClient.name}(既存患者)
+                  </Link>
+                ) : client.referralSourceType === "STAFF" && client.referralSourceStaff ? (
+                  `${client.referralSourceStaff.name}(スタッフ)`
+                ) : client.referralSourceType === "OTHER" ? (
+                  client.referralSourceNote || "その他"
+                ) : (
+                  "—"
+                )
+              }
             />
+            <Row label="登録区分" value={client.registrationType === "NEW" ? "新規" : "既存(データ移行)"} />
             <Row label="主担当" value={client.primaryStaff?.name ?? "—"} />
             <Row label="初回来院" value={fmtDate(client.firstVisitDate)} />
             <Row label="来院回数" value={`${client.initialVisitCount + client.visits.length}回`} />
+            <Row label="紹介人数" value={`${client.referralCount}人`} />
             <Row
               label="必要来院ペース"
               value={

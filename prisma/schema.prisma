@@ -25,6 +25,7 @@ model Staff {
   createdAt    DateTime  @default(now())
 
   primaryClients      Client[]             @relation("PrimaryStaff")
+  referralSourceFor   Client[]             @relation("ReferralSourceStaff")
   clientAssignments   ClientStaff[]
   visits              Visit[]
   staffMindsetChecks  StaffMindsetCheck[]
@@ -71,13 +72,20 @@ model Client {
   acquisitionChannelId String?
   acquisitionChannel   AcquisitionChannel? @relation(fields: [acquisitionChannelId], references: [id])
 
-  referredById String?
-  referredBy   Client?  @relation("Referral", fields: [referredById], references: [id])
-  referrals    Client[] @relation("Referral")
+  referralSourceType     ReferralSourceType? // 紹介元の種別(docs/referral-source-registration-type-spec-v2.md)
+  referralSourceClientId String?
+  referralSourceClient   Client?             @relation("Referral", fields: [referralSourceClientId], references: [id])
+  referrals              Client[]            @relation("Referral")
+  referralSourceStaffId  String?
+  referralSourceStaff    Staff?              @relation("ReferralSourceStaff", fields: [referralSourceStaffId], references: [id])
+  referralSourceNote     String? // referralSourceTypeがOTHERの場合の自由記述
+  referralCount          Int                 @default(0) // 紹介人数の累計(来院記録での紹介チェック・新規登録での紹介元指定の両方から加算)
 
   primaryStaffId   String?
   primaryStaff     Staff?        @relation("PrimaryStaff", fields: [primaryStaffId], references: [id])
   staffAssignments ClientStaff[]
+
+  registrationType RegistrationType // 新規/既存の登録区分(必須)。新規来院数の集計はこれがNEWの顧客のみを対象にする
 
   firstVisitDate    DateTime?
   isActive          Boolean   @default(true) // 離脱バッチが更新するフラグ
@@ -115,6 +123,19 @@ enum ClientRank {
   C1
   C2
   C3
+}
+
+// 紹介元入力方式の改善(docs/referral-source-registration-type-spec-v2.md)。
+enum ReferralSourceType {
+  EXISTING_CLIENT // 既存患者
+  STAFF // スタッフ
+  OTHER // その他
+}
+
+// 新規/既存登録区分(docs/referral-source-registration-type-spec-v2.md)。
+enum RegistrationType {
+  NEW // 新規
+  EXISTING // 既存(データ移行)
 }
 
 // 次回予約・キャンセル記録(docs/next-appointment-cancellation-spec-v2.md)。予約CSV取り込みとは別の独立したデータ。
@@ -197,6 +218,8 @@ model ChartRecord {
 
   menuPlan            MenuPlan? // 本日のメニュー(プラン)。lib/tags.ts の TREATMENT_MENU と対応
   treatmentModalities Json? // 物療チェック(コアレ10/コアレ20/ブースター/セラゼム/鍼/灸の済/未マップ。生活習慣サポートとは別概念)
+
+  isManualReturnFlag Boolean @default(false) // この来院が離脱からの復帰(再診)であることを示す手動フラグ(docs/referral-source-registration-type-spec-v2.md 再診数2.4)
 
   createdAt DateTime @default(now())
 }

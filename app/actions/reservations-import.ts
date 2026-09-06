@@ -111,6 +111,9 @@ async function resolveClient(row: ParsedReservationRow): Promise<{ id: string; c
       phone: row.phone,
       gender: row.gender,
       externalCustomerNo: row.customerNo,
+      // 予約CSV取り込みからの自動生成は、アプリ上での意図的な「新規顧客登録」操作ではないため、
+      // 新規来院数の集計に混入しないよう既存扱いにする(docs/referral-source-registration-type-spec-v2.md)。
+      registrationType: "EXISTING",
     },
   });
   return { id: created.id, created: true };
