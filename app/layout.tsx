@@ -41,6 +41,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/reservations/import" className="hover:text-emerald-800">
                     予約CSV取り込み
                   </Link>
+                  <Link href="/clients/import" className="hover:text-emerald-800">
+                    顧客CSV取り込み
+                  </Link>
                   <Link href="/products" className="hover:text-emerald-800">
                     物販売上
                   </Link>
