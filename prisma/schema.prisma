@@ -79,12 +79,14 @@ model Client {
   primaryStaff     Staff?        @relation("PrimaryStaff", fields: [primaryStaffId], references: [id])
   staffAssignments ClientStaff[]
 
-  firstVisitDate DateTime?
-  isActive       Boolean   @default(true) // 離脱バッチが更新するフラグ
-  createdAt      DateTime  @default(now())
+  firstVisitDate    DateTime?
+  isActive          Boolean   @default(true) // 離脱バッチが更新するフラグ
+  initialVisitCount Int       @default(0) // 登録時点までの来院回数(既存の実績)。表示上の来院回数 = これ + このアプリで記録したVisit件数
+  createdAt         DateTime  @default(now())
 
   medicalHistory String? // 既往(自由記述)
   familyData     String? // 家族データ(自由記述)
+  personalData   String? // 個人データ(自由記述)
 
   rank ClientRank? // ランク。顧客登録・編集画面、および来院のたびに来院記録フォームからも更新できる(現状値のみ保持、履歴は持たない)
 
@@ -182,7 +184,17 @@ model ChartRecord {
   referralGiven           Boolean   @default(false) // 紹介をしてくれたか
   referralCount           Int? // 紹介人数(任意。未入力時はreferralGiven=trueなら1として扱う)
 
+  menuPlan            MenuPlan? // 本日のメニュー(プラン)。lib/tags.ts の TREATMENT_MENU と対応
+  treatmentModalities Json? // 物療チェック(コアレ10/コアレ20/ブースター/セラゼム/鍼/灸の済/未マップ。生活習慣サポートとは別概念)
+
   createdAt DateTime @default(now())
+}
+
+enum MenuPlan {
+  BASIC_CARE // ベーシックケア
+  REPAIRNESS_PLAN // リペアネスプラン
+  CONDITIONING_PLAN // コンディショニングプラン
+  WELLNESS_PLAN // ウェルネスプラン
 }
 
 enum VisitInterval {

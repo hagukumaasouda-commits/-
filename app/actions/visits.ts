@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { VisitInterval, HealthHappinessScore, ClientRank } from "@/app/generated/prisma/client";
-import { LIFESTYLE_SUPPORT_ITEMS } from "@/lib/tags";
+import { VisitInterval, HealthHappinessScore, ClientRank, MenuPlan } from "@/app/generated/prisma/client";
+import { LIFESTYLE_SUPPORT_ITEMS, TREATMENT_MODALITY_ITEMS } from "@/lib/tags";
 
 export async function createVisit(clientId: string, formData: FormData) {
   const staffId = String(formData.get("staffId") || "");
@@ -40,6 +40,13 @@ export async function createVisit(clientId: string, formData: FormData) {
   const rankRaw = String(formData.get("rank") || "");
   const rank = rankRaw ? (rankRaw as ClientRank) : null;
 
+  const menuPlanRaw = String(formData.get("menuPlan") || "");
+  const menuPlan = menuPlanRaw ? (menuPlanRaw as MenuPlan) : null;
+  const checkedModalities = new Set(formData.getAll("treatmentModalities").map(String));
+  const treatmentModalities = Object.fromEntries(
+    TREATMENT_MODALITY_ITEMS.map((item) => [item, checkedModalities.has(item)])
+  );
+
   const existingCount = await prisma.visit.count({ where: { clientId } });
   const visitNo = existingCount + 1;
 
@@ -71,6 +78,8 @@ export async function createVisit(clientId: string, formData: FormData) {
       testimonialObtainedDate,
       referralGiven,
       referralCount,
+      menuPlan,
+      treatmentModalities,
     },
   });
 

@@ -13,6 +13,8 @@ export async function createClient(formData: FormData) {
   const primaryStaffId = String(formData.get("primaryStaffId") || "") || null;
   const firstVisitDateRaw = String(formData.get("firstVisitDate") || "");
   const rankRaw = String(formData.get("rank") || "");
+  const initialVisitCountRaw = String(formData.get("initialVisitCount") || "");
+  const initialVisitCount = initialVisitCountRaw ? parseInt(initialVisitCountRaw, 10) : 0;
 
   const client = await prisma.client.create({
     data: {
@@ -26,6 +28,8 @@ export async function createClient(formData: FormData) {
       primaryStaffId,
       firstVisitDate: firstVisitDateRaw ? new Date(firstVisitDateRaw) : null,
       rank: rankRaw ? (rankRaw as ClientRank) : null,
+      initialVisitCount: Number.isFinite(initialVisitCount) && initialVisitCount >= 0 ? initialVisitCount : 0,
+      personalData: String(formData.get("personalData") || "") || null,
     },
   });
 
@@ -46,6 +50,8 @@ export async function updateClient(clientId: string, formData: FormData) {
   const referredById = String(formData.get("referredById") || "") || null;
   const primaryStaffId = String(formData.get("primaryStaffId") || "") || null;
   const rankRaw = String(formData.get("rank") || "");
+  const initialVisitCountRaw = String(formData.get("initialVisitCount") || "");
+  const initialVisitCount = initialVisitCountRaw ? parseInt(initialVisitCountRaw, 10) : 0;
 
   await prisma.client.update({
     where: { id: clientId },
@@ -65,7 +71,9 @@ export async function updateClient(clientId: string, formData: FormData) {
       firstVisitDate: firstVisitDateRaw ? new Date(firstVisitDateRaw) : null,
       medicalHistory: String(formData.get("medicalHistory") || "") || null,
       familyData: String(formData.get("familyData") || "") || null,
+      personalData: String(formData.get("personalData") || "") || null,
       rank: rankRaw ? (rankRaw as ClientRank) : null,
+      initialVisitCount: Number.isFinite(initialVisitCount) && initialVisitCount >= 0 ? initialVisitCount : 0,
     },
   });
 

@@ -5,11 +5,14 @@ import {
   BODY_PART_TAGS,
   LIFESTYLE_SUPPORT_ITEMS,
   TREATMENT_MENU,
+  TREATMENT_MODALITY_ITEMS,
+  MENU_PLAN_OPTIONS,
   VISIT_INTERVAL_OPTIONS,
   HEALTH_HAPPINESS_OPTIONS,
   RANK_OPTIONS,
 } from "@/lib/tags";
 import { notFound } from "next/navigation";
+import { VisitMenuBuilder } from "./visit-menu-builder";
 
 export default async function NewVisitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -42,7 +45,11 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
         </div>
 
         <Field label="本日のメニュー">
-          <input name="menu" className="input" placeholder="例: 全身調整" />
+          <VisitMenuBuilder
+            menuPlanOptions={MENU_PLAN_OPTIONS}
+            chiefComplaintTags={CHIEF_COMPLAINT_TAGS}
+            treatmentModalityItems={TREATMENT_MODALITY_ITEMS}
+          />
         </Field>
 
         <details className="rounded-md border border-stone-200 bg-stone-50 p-3">
@@ -69,10 +76,6 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
             昔からの顧客は特別料金の場合があります。実際の請求額はプリカ台帳・物販記録にその都度手入力してください。
           </p>
         </details>
-
-        <Field label="主訴タグ">
-          <TagCheckboxes name="chiefComplaintTags" options={CHIEF_COMPLAINT_TAGS} />
-        </Field>
 
         <Field label="施術部位タグ">
           <TagCheckboxes name="bodyPartTags" options={BODY_PART_TAGS} />

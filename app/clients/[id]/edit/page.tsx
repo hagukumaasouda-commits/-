@@ -100,11 +100,25 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
             ))}
           </select>
         </Field>
+        <Field label="来院回数(これまでの実績)">
+          <input
+            type="number"
+            name="initialVisitCount"
+            min={0}
+            step={1}
+            defaultValue={client.initialVisitCount}
+            className="input"
+          />
+          <span className="text-xs text-stone-400">真の新患は0のまま。既存患者を登録する場合はこれまでの来院回数を入力</span>
+        </Field>
         <Field label="既往">
           <textarea name="medicalHistory" rows={3} defaultValue={client.medicalHistory ?? ""} className="input" />
         </Field>
         <Field label="家族データ">
           <textarea name="familyData" rows={3} defaultValue={client.familyData ?? ""} className="input" />
+        </Field>
+        <Field label="個人データ">
+          <textarea name="personalData" rows={3} defaultValue={client.personalData ?? ""} className="input" />
         </Field>
 
         <button type="submit" className="mt-2 rounded-md bg-emerald-800 px-4 py-2 text-sm font-medium text-white w-fit">

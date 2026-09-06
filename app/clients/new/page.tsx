@@ -76,6 +76,13 @@ export default async function NewClientPage() {
             ))}
           </select>
         </Field>
+        <Field label="来院回数(これまでの実績)">
+          <input type="number" name="initialVisitCount" min={0} step={1} defaultValue={0} className="input" />
+          <span className="text-xs text-stone-400">真の新患は0のまま。既存患者を登録する場合はこれまでの来院回数を入力</span>
+        </Field>
+        <Field label="個人データ">
+          <textarea name="personalData" rows={3} className="input" />
+        </Field>
         <button type="submit" className="mt-2 rounded-md bg-emerald-800 px-4 py-2 text-sm font-medium text-white w-fit">
           登録する
         </button>

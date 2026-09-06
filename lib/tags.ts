@@ -1,4 +1,4 @@
-import { VisitInterval, HealthHappinessScore, ClientRank } from "@/app/generated/prisma/client";
+import { VisitInterval, HealthHappinessScore, ClientRank, MenuPlan } from "@/app/generated/prisma/client";
 
 // カルテのタグ選択肢。集計(来院理由・部位別分布)の粒度をここで揃える。
 export const CHIEF_COMPLAINT_TAGS = [
@@ -45,6 +45,20 @@ export const TREATMENT_MENU = [
   { name: "コンディショニングプラン", memberPrice: 6800, generalPrice: 7300 },
   { name: "ウェルネスプラン", memberPrice: 8200, generalPrice: 8700 },
 ] as const;
+
+// 本日のメニュー(プラン)。TREATMENT_MENUの名称と対応する単一の情報源。
+export const MENU_PLAN_OPTIONS: { value: MenuPlan; label: string }[] = [
+  { value: "BASIC_CARE", label: "ベーシックケア" },
+  { value: "REPAIRNESS_PLAN", label: "リペアネスプラン" },
+  { value: "CONDITIONING_PLAN", label: "コンディショニングプラン" },
+  { value: "WELLNESS_PLAN", label: "ウェルネスプラン" },
+];
+export const MENU_PLAN_LABEL: Record<MenuPlan, string> = Object.fromEntries(
+  MENU_PLAN_OPTIONS.map((o) => [o.value, o.label])
+) as Record<MenuPlan, string>;
+
+// 物療チェック(生活習慣サポートとは別概念。新規フィールド)。
+export const TREATMENT_MODALITY_ITEMS = ["コアレ10", "コアレ20", "ブースター", "セラゼム", "鍼", "灸"] as const;
 
 // 必要来院ペース(docs/departure-followup-spec-v2.md v3、顧客管理シートの実際の選択肢と一致)。
 // 表示名・enum・CSVインポートでのラベル逆引きの単一の情報源。
