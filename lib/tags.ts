@@ -61,9 +61,6 @@ export const VISIT_INTERVAL_OPTIONS: { value: VisitInterval; label: string }[] =
 export const VISIT_INTERVAL_LABEL: Record<VisitInterval, string> = Object.fromEntries(
   VISIT_INTERVAL_OPTIONS.map((o) => [o.value, o.label])
 ) as Record<VisitInterval, string>;
-export const VISIT_INTERVAL_BY_LABEL: Record<string, VisitInterval> = Object.fromEntries(
-  VISIT_INTERVAL_OPTIONS.map((o) => [o.label, o.value])
-);
 
 // 回復度(健康度幸福度)。
 export const HEALTH_HAPPINESS_OPTIONS: { value: HealthHappinessScore; label: string }[] = [
@@ -78,9 +75,6 @@ export const HEALTH_HAPPINESS_OPTIONS: { value: HealthHappinessScore; label: str
 export const HEALTH_HAPPINESS_LABEL: Record<HealthHappinessScore, string> = Object.fromEntries(
   HEALTH_HAPPINESS_OPTIONS.map((o) => [o.value, o.label])
 ) as Record<HealthHappinessScore, string>;
-
-// 顧客ランク(週次/月次スナップショットで使用)。
-export const RANK_VALUES = ["AS", "A", "B", "C1", "C2", "C3"] as const;
 
 // 生活習慣サポート実施状況(初回カルテVer1.0の項目をそのまま踏襲。社内略称のまま表示する)。
 export const LIFESTYLE_SUPPORT_ITEMS = [
