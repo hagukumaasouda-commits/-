@@ -147,6 +147,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <section className="rounded-lg border border-stone-200 bg-white p-5 lg:col-span-1">
           <h2 className="font-semibold mb-3">基本情報</h2>
           <dl className="flex flex-col gap-2 text-sm">
+            <Row label="顧客番号" value={client.externalCustomerNo ?? "—"} />
             <Row label="性別" value={client.gender ?? "—"} />
             <Row label="電話" value={client.phone ?? "—"} />
             <Row label="住所" value={client.address ? `${client.postalCode ? `〒${client.postalCode} ` : ""}${client.address}` : "—"} />

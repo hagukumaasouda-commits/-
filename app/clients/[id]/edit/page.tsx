@@ -22,6 +22,9 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
         <Field label="氏名" required>
           <input name="name" required defaultValue={client.name} className="input" />
         </Field>
+        <Field label="顧客番号">
+          <input name="externalCustomerNo" defaultValue={client.externalCustomerNo ?? ""} className="input" placeholder="既存の顧客管理シートのID" />
+        </Field>
         <Field label="カナ">
           <input name="kana" defaultValue={client.kana ?? ""} className="input" />
         </Field>

@@ -15,6 +15,7 @@ export async function createClient(formData: FormData) {
   const client = await prisma.client.create({
     data: {
       name,
+      externalCustomerNo: String(formData.get("externalCustomerNo") || "") || null,
       kana: String(formData.get("kana") || "") || null,
       gender: String(formData.get("gender") || "") || null,
       phone: String(formData.get("phone") || "") || null,
@@ -46,6 +47,7 @@ export async function updateClient(clientId: string, formData: FormData) {
     where: { id: clientId },
     data: {
       name,
+      externalCustomerNo: String(formData.get("externalCustomerNo") || "") || null,
       kana: String(formData.get("kana") || "") || null,
       dob: dobRaw ? new Date(dobRaw) : null,
       gender: String(formData.get("gender") || "") || null,

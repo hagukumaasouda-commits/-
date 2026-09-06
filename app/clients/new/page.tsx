@@ -15,6 +15,9 @@ export default async function NewClientPage() {
         <Field label="氏名" required>
           <input name="name" required className="input" />
         </Field>
+        <Field label="顧客番号">
+          <input name="externalCustomerNo" className="input" placeholder="既存の顧客管理シートのID" />
+        </Field>
         <Field label="カナ">
           <input name="kana" className="input" />
         </Field>
