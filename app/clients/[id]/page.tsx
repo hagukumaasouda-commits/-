@@ -7,6 +7,7 @@ import { confirmDeparture, recordFollowupContact } from "@/app/actions/departure
 import { requestReassignment, resolveReassignment } from "@/app/actions/reassignments";
 import { recordPrepaidTransaction } from "@/app/actions/prepaid";
 import { recordProductSale } from "@/app/actions/products";
+import { setNextAppointment, cancelNextAppointment } from "@/app/actions/appointments";
 import { getClientPurchaseHistory } from "@/lib/product-reports";
 import {
   VISIT_INTERVAL_LABEL as visitIntervalLabel,
@@ -295,6 +296,28 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
         <section className="rounded-lg border border-stone-200 bg-white p-5 lg:col-span-1">
           <h2 className="font-semibold mb-3">予約</h2>
+
+          <div className="mb-4 flex flex-col gap-2 rounded-md border border-stone-200 bg-stone-50 p-3 text-sm">
+            <p className="text-stone-700">
+              {client.appointmentStatus === "BOOKED" && `次回予約: ${fmtDate(client.nextAppointmentDate)}`}
+              {client.appointmentStatus === "CANCELLED" && `キャンセル済み(${fmtDate(client.cancelledAt)})`}
+              {client.appointmentStatus === "NONE" && "予約なし"}
+            </p>
+            <form action={setNextAppointment.bind(null, client.id)} className="flex flex-wrap items-center gap-2">
+              <input type="date" name="nextAppointmentDate" required className="input py-1 text-sm" />
+              <button type="submit" className="rounded-md bg-stone-800 px-2.5 py-1 text-xs text-white">
+                次回予約日を記録する
+              </button>
+            </form>
+            {client.appointmentStatus === "BOOKED" && (
+              <form action={cancelNextAppointment.bind(null, client.id)}>
+                <button type="submit" className="text-xs text-stone-400 hover:text-stone-600 underline">
+                  キャンセルする
+                </button>
+              </form>
+            )}
+          </div>
+
           <ul className="flex flex-col gap-1.5 text-sm">
             {client.reservations.map((r) => (
               <li key={r.id} className="flex justify-between text-stone-600">
@@ -302,7 +325,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 <span className="text-xs">{r.status}</span>
               </li>
             ))}
-            {client.reservations.length === 0 && <p className="text-stone-400">予約なし</p>}
+            {client.reservations.length === 0 && <p className="text-stone-400">予約なし(予約CSV取り込み)</p>}
           </ul>
         </section>
       </div>

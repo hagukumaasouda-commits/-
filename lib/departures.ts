@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getChurnedClientIds } from "@/lib/reports";
-import { ReservationStatus } from "@/app/generated/prisma/client";
+import { ReservationStatus, AppointmentStatus } from "@/app/generated/prisma/client";
 
 // 離脱フォローアップ(docs/departure-followup-spec-v2.md)。
 // 離脱候補・キャンセル後未予約候補は DepartureRecord を作らず都度計算する(2.2 / 2.5(a))。
@@ -15,6 +15,7 @@ export type DepartureCandidate = {
   clientId: string;
   clientName: string;
   trigger: "pace" | "cancellation";
+  source?: "reservation" | "manual";
   lastVisitDate: Date | null;
   cancelledReservedAt: Date | null;
 };
@@ -66,16 +67,42 @@ async function getCancellationBasedCandidates(asOf: Date): Promise<DepartureCand
       clientId: c.clientId,
       clientName: clientNames.get(c.clientId)!,
       trigger: "cancellation" as const,
+      source: "reservation" as const,
       lastVisitDate: null,
       cancelledReservedAt: c.reservedAt,
     }));
 }
 
-/** 離脱候補一覧(都度計算・保存不要)。ペース基準とキャンセル後未予約の両方を合わせて返す。 */
+/**
+ * 次回予約・キャンセル記録(docs/next-appointment-cancellation-spec-v2.md)由来のキャンセル後未予約候補。
+ * appointmentStatus=CANCELLED かつ cancelledAt から CANCELLATION_FOLLOWUP_DAYS 以上経過(まだ isActive=true のもののみ)。
+ */
+async function getManualCancellationCandidates(asOf: Date): Promise<DepartureCandidate[]> {
+  const cutoff = new Date(asOf.getTime() - CANCELLATION_FOLLOWUP_DAYS * DAY_MS);
+
+  const clients = await prisma.client.findMany({
+    where: { isActive: true, appointmentStatus: AppointmentStatus.CANCELLED, cancelledAt: { lte: cutoff } },
+    select: { id: true, name: true, cancelledAt: true },
+  });
+
+  return clients.map((c) => ({
+    clientId: c.id,
+    clientName: c.name,
+    trigger: "cancellation" as const,
+    source: "manual" as const,
+    lastVisitDate: null,
+    cancelledReservedAt: c.cancelledAt,
+  }));
+}
+
+/** 離脱候補一覧(都度計算・保存不要)。ペース基準とキャンセル後未予約(予約CSV由来・手動記録由来)の両方を合わせて返す。 */
 export async function getDepartureCandidates(asOf: Date = new Date()): Promise<DepartureCandidate[]> {
-  const [pace, cancellation] = await Promise.all([
+  const [pace, reservationCancellation, manualCancellation] = await Promise.all([
     getPaceBasedCandidates(asOf),
     getCancellationBasedCandidates(asOf),
+    getManualCancellationCandidates(asOf),
   ]);
-  return [...pace, ...cancellation];
+  // 同一顧客が両方のキャンセル経路に該当する場合、呼び出し側の重複排除ロジックが後勝ちで扱うため、
+  // より正確な起点日を持つ手動記録(manual)を最後に置いて優先させる。
+  return [...pace, ...reservationCancellation, ...manualCancellation];
 }

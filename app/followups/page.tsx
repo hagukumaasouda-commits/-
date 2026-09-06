@@ -160,7 +160,7 @@ export default async function FollowupsPage({
                 </Link>
                 <span className="text-xs text-stone-500">
                   {c.trigger === "cancellation"
-                    ? `キャンセル後未予約(予約日: ${c.cancelledReservedAt ? fmtDate(c.cancelledReservedAt) : "—"})`
+                    ? `キャンセル後未予約(${c.source === "manual" ? "キャンセル日" : "予約日"}: ${c.cancelledReservedAt ? fmtDate(c.cancelledReservedAt) : "—"})`
                     : `最終来院: ${c.lastVisitDate ? fmtDate(c.lastVisitDate) : "—"}`}
                 </span>
               </div>

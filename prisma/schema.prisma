@@ -90,6 +90,10 @@ model Client {
 
   rank ClientRank? // ランク。顧客登録・編集画面、および来院のたびに来院記録フォームからも更新できる(現状値のみ保持、履歴は持たない)
 
+  nextAppointmentDate DateTime? // 次回予約日。会計時などにスタッフが手動入力(予約CSV取り込みとは別の独立したデータ)
+  appointmentStatus   AppointmentStatus @default(NONE)
+  cancelledAt         DateTime? // appointmentStatusがCANCELLEDになった日(離脱フォロー2.5節のキャンセル起点日)
+
   visits               Visit[]
   treatmentCourses     TreatmentCourse[]
   prepaidCard          PrepaidCard?
@@ -111,6 +115,13 @@ enum ClientRank {
   C1
   C2
   C3
+}
+
+// 次回予約・キャンセル記録(docs/next-appointment-cancellation-spec-v2.md)。予約CSV取り込みとは別の独立したデータ。
+enum AppointmentStatus {
+  BOOKED // 予約あり
+  CANCELLED // キャンセル
+  NONE // 予約なし
 }
 
 // 複数担当(祥平, 由衣 など)を許容するための中間テーブル。primaryStaffId は代表担当。
