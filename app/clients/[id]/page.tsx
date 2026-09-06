@@ -82,10 +82,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
   const purchaseHistory = await getClientPurchaseHistory(client.id);
   const allStaff = await prisma.staff.findMany({ where: { active: true }, orderBy: { name: "asc" } });
-  const latestSnapshot = await prisma.clientStatusSnapshot.findFirst({
-    where: { clientId: client.id },
-    orderBy: { snapshotDate: "desc" },
-  });
   const activeProducts = await prisma.product.findMany({ where: { active: true }, orderBy: { name: "asc" } });
   const openReassignment = client.reassignmentRequests.find((r) => r.status === "IN_DISCUSSION");
 
@@ -132,7 +128,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <h2 className="font-semibold mb-3">基本情報</h2>
           <dl className="flex flex-col gap-2 text-sm">
             <Row label="顧客番号" value={client.externalCustomerNo ?? "—"} />
-            <Row label="ランク" value={latestSnapshot?.rank ?? "—"} />
+            <Row label="ランク" value={client.rank ?? "—"} />
             <Row label="性別" value={client.gender ?? "—"} />
             <Row label="電話" value={client.phone ?? "—"} />
             <Row label="住所" value={client.address ? `${client.postalCode ? `〒${client.postalCode} ` : ""}${client.address}` : "—"} />

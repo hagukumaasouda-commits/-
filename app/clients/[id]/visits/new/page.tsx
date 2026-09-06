@@ -7,12 +7,13 @@ import {
   TREATMENT_MENU,
   VISIT_INTERVAL_OPTIONS,
   HEALTH_HAPPINESS_OPTIONS,
+  RANK_OPTIONS,
 } from "@/lib/tags";
 import { notFound } from "next/navigation";
 
 export default async function NewVisitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const client = await prisma.client.findUnique({ where: { id }, select: { id: true, name: true } });
+  const client = await prisma.client.findUnique({ where: { id }, select: { id: true, name: true, rank: true } });
   if (!client) notFound();
 
   const staff = await prisma.staff.findMany({ where: { active: true }, orderBy: { name: "asc" } });
@@ -106,7 +107,7 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <Field label="必要来院ペース">
             <select name="requiredVisitInterval" className="input" defaultValue="">
               <option value="">未設定</option>
@@ -121,6 +122,16 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
             <select name="healthHappinessScore" className="input" defaultValue="">
               <option value="">未設定</option>
               {HEALTH_HAPPINESS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="ランク">
+            <select name="rank" className="input" defaultValue={client.rank ?? ""}>
+              <option value="">未選択</option>
+              {RANK_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>

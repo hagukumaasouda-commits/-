@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { VisitInterval, HealthHappinessScore } from "@/app/generated/prisma/client";
+import { VisitInterval, HealthHappinessScore, ClientRank } from "@/app/generated/prisma/client";
 import { LIFESTYLE_SUPPORT_ITEMS } from "@/lib/tags";
 
 export async function createVisit(clientId: string, formData: FormData) {
@@ -36,6 +36,9 @@ export async function createVisit(clientId: string, formData: FormData) {
   const referralGiven = formData.get("referralGiven") === "true";
   const referralCountRaw = String(formData.get("referralCount") || "");
   const referralCount = referralGiven ? Number(referralCountRaw) || 1 : null;
+
+  const rankRaw = String(formData.get("rank") || "");
+  const rank = rankRaw ? (rankRaw as ClientRank) : null;
 
   const existingCount = await prisma.visit.count({ where: { clientId } });
   const visitNo = existingCount + 1;
@@ -74,10 +77,10 @@ export async function createVisit(clientId: string, formData: FormData) {
   if (visitNo === 1) {
     await prisma.client.update({
       where: { id: clientId },
-      data: { firstVisitDate: new Date(visitDateRaw), isActive: true },
+      data: { firstVisitDate: new Date(visitDateRaw), isActive: true, rank },
     });
   } else {
-    await prisma.client.update({ where: { id: clientId }, data: { isActive: true } });
+    await prisma.client.update({ where: { id: clientId }, data: { isActive: true, rank } });
   }
 
   redirect(`/clients/${clientId}`);
