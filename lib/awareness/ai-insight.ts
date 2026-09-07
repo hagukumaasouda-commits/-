@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { CheckType, Severity } from "@/app/generated/prisma/client";
-import { CHURN_THRESHOLD_DAYS } from "@/lib/reports";
+import { CHURN_THRESHOLD_DAYS, VISIT_INTERVAL_DAYS, CHURN_INTERVAL_MULTIPLIER } from "@/lib/reports";
 
 // AI気づき: 「関わりの質」「離脱兆候」について、断定せず問いかけの形で気づきを提示する。
 // 設計方針(要件定義より):
@@ -9,7 +9,8 @@ import { CHURN_THRESHOLD_DAYS } from "@/lib/reports";
 //   - スタッフを監視・評価する仕組みにはしない
 //   - 出力は awareness_checks に保存されるだけで、顧客ステータスを自動変更しない
 //
-// ANTHROPIC_API_KEY が未設定の場合は何もせず空配列を返す(事務チェックだけは動く)。
+// ANTHROPIC_API_KEY が未設定の場合は何もせず status: "not_configured" を返す(事務チェックだけは動く)。
+// docs/office-check-ai-insight-foundation-spec-v2.md: 離脱閾値の個別化・渡すデータの拡充・エラー状態の可視化。
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5";
 
@@ -23,7 +24,7 @@ const SYSTEM_PROMPT = `あなたは治療院「はぐくま」のスタッフ向
 
 見るべき観点:
 1. 来院頻度に対して、声かけ・フォロー・カルテの記述が薄くなっていないか
-2. 来店間隔が過去のペースから広がっていないか
+2. 来店間隔が過去のペースから広がっていないか(churnThresholdDaysはこの顧客の必要来院ペースから計算した個別の目安)
 3. プリカ残高は減っているのに来店が止まっていないか(残高が残ったまま最終来院から日数が経っている場合)
 4. 施術内容(部位タグ)や主訴が急に変化していないか
 
@@ -40,6 +41,11 @@ export type AiInsight = {
   message: string;
   severity: Severity;
 };
+
+export type AiInsightResult =
+  | { status: "not_configured"; insights: AiInsight[] }
+  | { status: "ok"; insights: AiInsight[] }
+  | { status: "error"; insights: AiInsight[] };
 
 function parseInsights(text: string): AiInsight[] {
   const trimmed = text.trim();
@@ -71,6 +77,10 @@ async function buildClientContext(clientId: string) {
     select: {
       name: true,
       firstVisitDate: true,
+      rank: true,
+      medicalHistory: true,
+      familyData: true,
+      personalData: true,
       acquisitionChannel: { select: { name: true } },
     },
   });
@@ -90,6 +100,9 @@ async function buildClientContext(clientId: string) {
           evaluation: true,
           changeFromLast: true,
           clientVoice: true,
+          requiredVisitInterval: true,
+          healthHappinessScore: true,
+          lifestyleSupportStatus: true,
         },
       },
     },
@@ -109,17 +122,43 @@ async function buildClientContext(clientId: string) {
     select: { reservedAt: true, status: true },
   });
 
+  // 離脱記録・担当変更相談の履歴は、トークン量に配慮して件数+直近1件の要約のみ渡す(仕様書2.3節)。
+  const departureRecords = await prisma.departureRecord.findMany({
+    where: { clientId },
+    orderBy: { confirmedAt: "desc" },
+    select: { confirmedAt: true, reason: true, triggeredByCancellation: true },
+  });
+  const reassignmentRequests = await prisma.reassignmentRequest.findMany({
+    where: { clientId },
+    orderBy: { createdAt: "desc" },
+    select: { status: true, note: true, createdAt: true },
+  });
+
   const lastVisit = visits[0];
   const daysSinceLastVisit = lastVisit
     ? Math.floor((Date.now() - lastVisit.visitDate.getTime()) / (24 * 60 * 60 * 1000))
     : null;
 
+  // 離脱判定閾値は、docs/departure-followup-spec-v2.md 2.2節と同じ「必要来院ペース×3」を使う
+  // (固定42日はrequiredVisitIntervalが未記録の場合のフォールバックとしてのみ使う)。
+  const requiredVisitInterval = lastVisit?.chartRecord?.requiredVisitInterval ?? null;
+  const churnThresholdDays = requiredVisitInterval
+    ? VISIT_INTERVAL_DAYS[requiredVisitInterval] * CHURN_INTERVAL_MULTIPLIER
+    : CHURN_THRESHOLD_DAYS;
+
   return {
     clientName: client.name,
     acquisitionChannel: client.acquisitionChannel?.name ?? null,
     firstVisitDate: client.firstVisitDate,
+    rank: client.rank,
+    medicalHistory: client.medicalHistory,
+    familyData: client.familyData,
+    personalData: client.personalData,
     daysSinceLastVisit,
-    churnThresholdDays: CHURN_THRESHOLD_DAYS,
+    requiredVisitInterval,
+    churnThresholdDays,
+    recentHealthHappinessScore: lastVisit?.chartRecord?.healthHappinessScore ?? null,
+    recentLifestyleSupportStatus: lastVisit?.chartRecord?.lifestyleSupportStatus ?? null,
     recentVisits: visits.map((v) => ({
       visitNo: v.visitNo,
       visitDate: v.visitDate,
@@ -133,40 +172,55 @@ async function buildClientContext(clientId: string) {
     prepaidBalance: balance,
     prepaidLastUseDate: lastUseDate,
     recentReservations: reservations,
+    departureHistory: {
+      count: departureRecords.length,
+      mostRecent: departureRecords[0]
+        ? {
+            confirmedAt: departureRecords[0].confirmedAt,
+            reason: departureRecords[0].reason,
+            triggeredByCancellation: departureRecords[0].triggeredByCancellation,
+          }
+        : null,
+    },
+    reassignmentHistory: {
+      count: reassignmentRequests.length,
+      mostRecent: reassignmentRequests[0]
+        ? { status: reassignmentRequests[0].status, note: reassignmentRequests[0].note }
+        : null,
+    },
   };
 }
 
-export async function generateAiInsights(clientId: string): Promise<AiInsight[]> {
-  if (!process.env.ANTHROPIC_API_KEY) return [];
+export async function generateAiInsights(clientId: string): Promise<AiInsightResult> {
+  if (!process.env.ANTHROPIC_API_KEY) return { status: "not_configured", insights: [] };
 
-  const context = await buildClientContext(clientId);
-  const client = new Anthropic();
-
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 4096,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: JSON.stringify(context, null, 2) }],
-  });
-
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") return [];
-
-  return parseInsights(textBlock.text);
-}
-
-export async function saveAiInsights(visitId: string, clientId: string): Promise<number> {
-  let insights: AiInsight[];
   try {
-    insights = await generateAiInsights(clientId);
+    const context = await buildClientContext(clientId);
+    const client = new Anthropic();
+
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 4096,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: JSON.stringify(context, null, 2) }],
+    });
+
+    const textBlock = response.content.find((b) => b.type === "text");
+    if (!textBlock || textBlock.type !== "text") return { status: "ok", insights: [] };
+
+    return { status: "ok", insights: parseInsights(textBlock.text) };
   } catch (err) {
     console.error("AI insight generation failed:", err);
-    return 0;
+    return { status: "error", insights: [] };
   }
-  if (insights.length === 0) return 0;
+}
+
+export async function saveAiInsights(visitId: string, clientId: string): Promise<AiInsightResult> {
+  const result = await generateAiInsights(clientId);
+  if (result.insights.length === 0) return result;
 
   await prisma.awarenessCheck.createMany({
-    data: insights.map((i) => ({
+    data: result.insights.map((i) => ({
       visitId,
       checkType: CheckType.AI_INSIGHT,
       category: i.category,
@@ -174,5 +228,5 @@ export async function saveAiInsights(visitId: string, clientId: string): Promise
       severity: i.severity,
     })),
   });
-  return insights.length;
+  return result;
 }

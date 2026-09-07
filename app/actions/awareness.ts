@@ -3,22 +3,30 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { saveOfficeCheck } from "@/lib/awareness/office";
-import { saveAiInsights } from "@/lib/awareness/ai-insight";
+import { saveAiInsights, type AiInsightResult } from "@/lib/awareness/ai-insight";
 import { CheckStatus } from "@/app/generated/prisma/client";
 import { auth } from "@/auth";
 
-// 「気づきチェック」ボタンから呼ばれるサーバーアクション。
+export type AwarenessCheckState = { aiStatus: AiInsightResult["status"] | null };
+
+// 「気づきチェック」ボタンから呼ばれるサーバーアクション(useActionStateで結果を受け取るシグネチャ)。
 // 事務チェック(ルールベース)とAI気づき(生成AI)を両方走らせ、
 // awareness_checks に保存するだけで、顧客のステータス等は一切変更しない。
-export async function runAwarenessCheck(visitId: string): Promise<void> {
+// AI側の実行結果(ok/error/not_configured)を呼び出し元に返し、失敗時にUIへ表示できるようにする。
+export async function runAwarenessCheck(
+  visitId: string,
+  _prevState: AwarenessCheckState,
+  _formData: FormData
+): Promise<AwarenessCheckState> {
   const visit = await prisma.visit.findUniqueOrThrow({
     where: { id: visitId },
     select: { clientId: true },
   });
 
-  await Promise.all([saveOfficeCheck(visitId), saveAiInsights(visitId, visit.clientId)]);
+  const [, aiResult] = await Promise.all([saveOfficeCheck(visitId), saveAiInsights(visitId, visit.clientId)]);
 
   revalidatePath(`/clients/${visit.clientId}`);
+  return { aiStatus: aiResult.status };
 }
 
 export async function submitDialogue(formData: FormData) {

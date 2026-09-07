@@ -117,7 +117,6 @@ async function main() {
           evaluation: `第${i}回。前回からの反応は良好。`,
           changeFromLast: i === 1 ? null : "可動域がやや改善",
           nextCheck: "睡眠時間の変化を確認",
-          requiredFields: { menu: "完", evaluation: "完", nextCheck: "完" },
         },
       });
       visitDate = new Date(visitDate.getTime() + intervalDays * DAY);

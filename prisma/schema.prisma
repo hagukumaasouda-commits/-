@@ -202,8 +202,6 @@ model ChartRecord {
   nextCheck       String? // 次回確認
   nextRequired    String? // 次回必須
 
-  requiredFields Json? // 必須項目チェックリストの状態(未/完) -> 事務チェックが参照
-
   requiredVisitInterval VisitInterval? // 必要来院ペース。離脱候補判定に、その顧客の直近の値を使う(未記録なら42日固定にフォールバック)
 
   lifestyleSupportStatus Json? // 生活習慣サポート実施状況(てる1〜Bトレ等、社内略称キーの済/未マップ。lib/tags.ts の LIFESTYLE_SUPPORT_ITEMS)

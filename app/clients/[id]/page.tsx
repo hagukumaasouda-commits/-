@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { CheckType } from "@/app/generated/prisma/client";
-import { runAwarenessCheck, resolveAwarenessCheck, submitDialogue } from "@/app/actions/awareness";
+import { resolveAwarenessCheck, submitDialogue } from "@/app/actions/awareness";
+import { AwarenessCheckButton } from "./awareness-check-button";
 import { confirmDeparture, recordFollowupContact } from "@/app/actions/departures";
 import { requestReassignment, resolveReassignment } from "@/app/actions/reassignments";
 import { recordPrepaidTransaction } from "@/app/actions/prepaid";
@@ -494,11 +495,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <section className="rounded-lg border border-stone-200 bg-white p-5">
           <div className="flex items-center justify-between mb-1">
             <h2 className="font-semibold">気づきチェック</h2>
-            <form action={runAwarenessCheck.bind(null, latestVisit.id)}>
-              <button className="rounded-md border border-emerald-800 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50">
-                最新来院(第{latestVisit.visitNo}回)を気づきチェックする
-              </button>
-            </form>
+            <AwarenessCheckButton visitId={latestVisit.id} visitNo={latestVisit.visitNo} />
           </div>
           <p className="text-xs text-stone-500">
             事務チェック(記入漏れ)とAI気づき(関わりの質・離脱兆候)は別々に走ります。AIは判断を下すのではなく、対話のきっかけを提示するだけです。

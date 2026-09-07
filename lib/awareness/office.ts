@@ -3,6 +3,7 @@ import { CheckType, Severity } from "@/app/generated/prisma/client";
 
 // 事務チェック: 記入漏れの有無だけを見るルールベースのチェック。
 // AIは使わない(速く・ブレない・断定して良い)。関わりの質の判断は ai-insight.ts の役割。
+// 対象フィールド一覧・条件は docs/office-check-ai-insight-foundation-spec-v2.md 参照。
 
 export type OfficeFinding = {
   category: string;
@@ -12,7 +13,10 @@ export type OfficeFinding = {
 
 export async function runOfficeCheck(visitId: string): Promise<OfficeFinding[]> {
   const chart = await prisma.chartRecord.findUnique({ where: { visitId } });
-  const visit = await prisma.visit.findUniqueOrThrow({ where: { id: visitId } });
+  const visit = await prisma.visit.findUniqueOrThrow({
+    where: { id: visitId },
+    include: { client: { select: { rank: true } } },
+  });
 
   const findings: OfficeFinding[] = [];
 
@@ -61,19 +65,46 @@ export async function runOfficeCheck(visitId: string): Promise<OfficeFinding[]> 
       severity: Severity.INFO,
     });
   }
-  if (chart.requiredFields && typeof chart.requiredFields === "object") {
-    const unfinished = Object.entries(chart.requiredFields as Record<string, string>).filter(
-      ([, v]) => v === "未"
-    );
-    if (unfinished.length > 0) {
-      findings.push({
-        category: "記入漏れ",
-        message: `生活習慣・体質改善サポートのチェック項目が${unfinished.length}件「未」のままです(${unfinished
-          .map(([k]) => k)
-          .join("、")})。`,
-        severity: Severity.INFO,
-      });
-    }
+  // 初回来院(visitNo === 1)は「前回」が存在しないため対象外
+  if (visit.visitNo > 1 && !chart.changeFromLast) {
+    findings.push({
+      category: "記入漏れ",
+      message: "「前回からの変化」が未入力です。",
+      severity: Severity.NOTICE,
+    });
+  }
+  if (!visit.client.rank) {
+    findings.push({
+      category: "記入漏れ",
+      message: "「ランク」が未設定です。毎回の来院で見直す想定です。",
+      severity: Severity.NOTICE,
+    });
+  }
+  // lifestyleSupportStatus は来院記録フォームから常に全項目分のオブジェクトが送信されるため、
+  // 「未入力」はnullではなく「実施項目が一つもチェックされていない」ことを指す。
+  const lifestyleValues = chart.lifestyleSupportStatus
+    ? Object.values(chart.lifestyleSupportStatus as Record<string, boolean>)
+    : [];
+  if (lifestyleValues.length === 0 || lifestyleValues.every((done) => !done)) {
+    findings.push({
+      category: "記入漏れ",
+      message: "「生活習慣サポート実施状況」が未入力です。",
+      severity: Severity.INFO,
+    });
+  }
+  if (!chart.clientVoice) {
+    findings.push({
+      category: "記入漏れ",
+      message: "「お客様の声(自己認識)」が未入力です。",
+      severity: Severity.NOTICE,
+    });
+  }
+  if (!chart.requiredVisitInterval) {
+    findings.push({
+      category: "記入漏れ",
+      message: "「必要来院ペース」が未入力です。見直しを検討してください。",
+      severity: Severity.NOTICE,
+    });
   }
 
   return findings;

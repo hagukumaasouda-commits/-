@@ -22,7 +22,8 @@ export function VisitMenuBuilder({
   const [override, setOverride] = useState("");
 
   const planLabel = menuPlanOptions.find((o) => o.value === menuPlan)?.label ?? "";
-  const autoText = `${planLabel}(${tags.join(",")})+${modalities.join(",")}`;
+  const hasSelection = menuPlan !== "" || tags.length > 0 || modalities.length > 0;
+  const autoText = hasSelection ? `${planLabel}(${tags.join(",")})+${modalities.join(",")}` : "";
   const finalText = override.trim() ? override : autoText;
 
   return (
