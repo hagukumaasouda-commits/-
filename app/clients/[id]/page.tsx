@@ -245,6 +245,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <p className="text-sm text-stone-400 mb-3">プリカ未発行(下のフォームから記録すると発行されます)</p>
           )}
 
+          {client.prepaidCard && (
+            <Link href={`/clients/${client.id}/prepaid-statement`} className="text-xs text-emerald-800 underline">
+              全期間の明細を見る・印刷する
+            </Link>
+          )}
+
           <details className="mt-3">
             <summary className="cursor-pointer text-sm font-medium text-stone-700">入出金を記録する</summary>
             <form action={recordPrepaidTransaction.bind(null, client.id)} className="mt-2 flex flex-col gap-2">

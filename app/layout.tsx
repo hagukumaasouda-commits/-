@@ -15,7 +15,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="ja" className="h-full">
       <body className="min-h-full flex flex-col bg-stone-50 text-stone-900">
-        <header className="border-b border-stone-200 bg-white">
+        <header className="border-b border-stone-200 bg-white print:hidden">
           <div className="mx-auto max-w-6xl px-6 py-3 flex items-center gap-6">
             <Link href="/dashboard" className="font-semibold tracking-tight text-emerald-800">
               はぐくま CRM
@@ -55,8 +55,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
           </div>
         </header>
-        <main className="flex-1">
-          <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
+        <main className="flex-1 print:bg-white">
+          <div className="mx-auto max-w-6xl px-6 py-8 print:max-w-none print:p-0">{children}</div>
         </main>
       </body>
     </html>
