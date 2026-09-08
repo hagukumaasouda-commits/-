@@ -32,6 +32,7 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
    | `AUTH_SECRET` | `openssl rand -base64 32` で生成した値(ローカルの`.env`とは別に、本番専用の値を新規生成してください) |
    | `ANTHROPIC_API_KEY` | Anthropic APIキー |
    | `LINE_CHANNEL_ACCESS_TOKEN` | LINE公式アカウントのチャネルアクセストークン |
+   | `LINE_CHANNEL_SECRET` | LINE Webhookの署名検証用チャネルシークレット(トークンとは別の値) |
    | `APP_TZ` | `Asia/Tokyo`(来店日時のタイムゾーンを正しく扱うために必須。Vercelでは変数名 `TZ` が予約済みのため `APP_TZ` という名前で受け取り、`instrumentation.ts` が起動時に反映します) |
 
 5. 「Deploy」をクリック
@@ -104,7 +105,8 @@ cp .env.example .env
 | `AUTH_SECRET` | スタッフログイン(Auth.js)のセッション署名鍵 | 必須。環境ごとに `openssl rand -base64 32` で個別生成してください |
 | `ANTHROPIC_API_KEY` | AI気づき(関わりの質・離脱兆候)の生成 | 未設定でもアプリは動きます。事務チェックのみ実行され、AI気づきは黙ってスキップされます |
 | `ANTHROPIC_MODEL` | AI気づきに使うモデルID(省略時 `claude-opus-5`) | 省略可 |
-| `LINE_CHANNEL_ACCESS_TOKEN` | 将来のLINEリマインド自動送信用(未実装、下記「未接続の連携」参照) | 未使用 |
+| `LINE_CHANNEL_ACCESS_TOKEN` | LINEリマインド送信・友だち一覧取得用 | 未設定だとリマインド送信・遡及登録が失敗します(理由をUIに表示) |
+| `LINE_CHANNEL_SECRET` | `/api/line/webhook` の署名検証用 | 未設定だとWebhookは全リクエストを401で拒否します |
 
 ### 4. マイグレーション・シード投入
 
@@ -178,9 +180,12 @@ npm run dev
 - **エンコーディング**: UTF-8 / Shift_JIS のどちらでアップロードされても自動判別してデコードします(動作確認済み)。
 - 取り込むのは予約情報のみです。会計時の売上・店販(プリカチャージも会計時の店販行として同じCSVに含まれているようでした)は今回は取り込んでいません。将来「数値管理(売上)」機能を作る際、同じCSVがその材料にもなり得ます。
 
-## 未接続の連携
+## LINE友だち紐づけ(`/line-friends`)
 
-- **LINE公式アカウントのMessaging API(自動リマインド)**: チャネルアクセストークンの発行・友だち追加時のユーザーID連携が必要。`Client.lineUserId` フィールドと `LINE_CHANNEL_ACCESS_TOKEN` の環境変数、送信関数(`lib/line.ts`)は用意済みですが、有効なトークンがまだ無いため実送信は未検証です。
+`docs/line-friend-linking-spec-v2.md`参照。LINE公式アカウントの友だち追加をWebhook(`/api/line/webhook`)で検知し、`LineFriend`テーブルに記録します。管理画面の`/line-friends`で、表示名の先頭が顧客番号になっているパターンを自動サジェストしつつ、顧客とワンクリック/手動検索でリンクできます。リンクすると`Client.lineUserId`にコピーされ、既存の予約リマインド送信(`/reminders`)からそのまま使われます。
+
+- **LINE Developersコンソールで、Webhook URLを`https://<本番ドメイン>/api/line/webhook`に設定し、Webhookの利用を有効にしてください**。`LINE_CHANNEL_SECRET`(署名検証用、`LINE_CHANNEL_ACCESS_TOKEN`とは別の値)を環境変数に設定していないと、Webhookは全リクエストを401で拒否します。
+- **遡及登録の制限**: Webhook設置前から友だち追加済みだったユーザーは、`/line-friends`の「友だち一覧を取得」ボタン(`GET /v2/bot/followers/ids`)で遡って登録できますが、**LINEのiOS/Android版アプリのユーザーのみが対象**というLINE側の制限があり、LINEデスクトップ版のみ利用している友だちは一覧に載りません。この分は、Webhook側で「follow以外のイベント(メッセージ受信等)でもまだ記録が無ければ登録する」保険を入れてあるため、該当の友だちが何かメッセージを送ってくれば拾えます。それでも一切メッセージが来ない相手は、LINE公式アカウント管理画面がユーザーIDを表示しないため、システム的に拾う手段がありません(次回来店時にLINEで一言送ってもらう運用回避が必要です)。
 - **AI気づきに送信するデータ**: `lib/awareness/ai-insight.ts` は氏名・来院履歴・タグ・プリカ残高・予約状況をAnthropic APIに送信します。住所・電話番号・生年月日は送信していません。外部送信の可否は院内のポリシーに合わせて調整してください。
 
 ## 集計ロジックの単体確認

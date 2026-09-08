@@ -35,6 +35,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/reminders" className="hover:text-emerald-800">
                     予約リマインド
                   </Link>
+                  <Link href="/line-friends" className="hover:text-emerald-800">
+                    LINE友だち紐づけ
+                  </Link>
                   <Link href="/followups" className="hover:text-emerald-800">
                     フォローアップ
                   </Link>

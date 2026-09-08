@@ -38,6 +38,7 @@ model Staff {
   reassignmentsAsCurrent  ReassignmentRequest[] @relation("ReassignmentCurrentStaff")
   reassignmentsRequested  ReassignmentRequest[] @relation("ReassignmentRequestedBy")
   reassignmentsAsNewStaff ReassignmentRequest[] @relation("ReassignmentNewStaff")
+  lineFriendsLinked       LineFriend[]          @relation("LineFriendLinkedBy")
 }
 
 enum StaffRole {
@@ -110,6 +111,7 @@ model Client {
   productSales         ProductSale[]
   departureRecords     DepartureRecord[]
   reassignmentRequests ReassignmentRequest[]
+  lineFriend           LineFriend?
 
   @@index([acquisitionChannelId])
   @@index([primaryStaffId])
@@ -345,6 +347,25 @@ enum ReservationStatus {
   CANCELLED
   CHANGED
   COMPLETED
+}
+
+// LINE公式アカウントの友だち紐づけ(docs/line-friend-linking-spec-v2.md)。
+// Client.lineUserId(送信先として参照される既存フィールド)とは別に、友だち全員の台帳として持つ。
+// 紐づけ確定時に、そのlineUserIdをClient.lineUserIdへコピーする。
+model LineFriend {
+  id           String    @id @default(cuid())
+  lineUserId   String    @unique
+  displayName  String? // followイベント時点(または遡及登録実行時点)の表示名。その後の変化は追わない
+  followedAt   DateTime  @default(now())
+  unfollowedAt DateTime? // ブロックされた日時(参考記録。行は削除しない)
+
+  linkedClientId  String?   @unique
+  linkedClient    Client?   @relation(fields: [linkedClientId], references: [id])
+  linkedAt        DateTime?
+  linkedByStaffId String?
+  linkedByStaff   Staff?    @relation("LineFriendLinkedBy", fields: [linkedByStaffId], references: [id])
+
+  @@index([linkedClientId])
 }
 
 // ---------------------------------------------------------------------------
