@@ -300,6 +300,25 @@ export async function getPrepaidDrainWithoutVisit(period: ReportPeriod) {
     .sort((a, b) => b.balance - a.balance);
 }
 
+/**
+ * 誕生月アラート: 生年月日が登録されている顧客のうち、当月が誕生月の人を日付順に返す。
+ * ダッシュボードの期間切り替え(週次/月次・前後移動)とは独立に、常に「実際の今月」を基準にする
+ * (スタッフへの声かけリマインドが目的のため、過去・未来の期間表示では意味がない)。
+ */
+export type BirthdayClient = { clientId: string; clientName: string; dob: Date; isActive: boolean; phone: string | null };
+
+export async function getBirthdayClientsThisMonth(asOf: Date = new Date()): Promise<BirthdayClient[]> {
+  const clients = await prisma.client.findMany({
+    where: { dob: { not: null } },
+    select: { id: true, name: true, dob: true, isActive: true, phone: true },
+  });
+  const month = asOf.getUTCMonth();
+  return clients
+    .filter((c) => c.dob!.getUTCMonth() === month)
+    .map((c) => ({ clientId: c.id, clientName: c.name, dob: c.dob!, isActive: c.isActive, phone: c.phone }))
+    .sort((a, b) => a.dob.getUTCDate() - b.dob.getUTCDate());
+}
+
 /** 12. 来院理由・部位別分布(期間内の来院分) */
 export async function getComplaintAndBodyPartDistribution(period: ReportPeriod) {
   const rows = await prisma.chartRecord.findMany({

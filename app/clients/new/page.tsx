@@ -54,6 +54,9 @@ export default async function NewClientPage() {
         <Field label="カナ">
           <input name="kana" className="input" />
         </Field>
+        <Field label="生年月日">
+          <input type="date" name="dob" className="input" />
+        </Field>
         <Field label="性別">
           <select name="gender" className="input">
             <option value="">未選択</option>

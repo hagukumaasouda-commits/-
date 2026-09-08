@@ -38,6 +38,7 @@ export async function createClient(formData: FormData) {
   const acquisitionChannelId = String(formData.get("acquisitionChannelId") || "") || null;
   const primaryStaffId = String(formData.get("primaryStaffId") || "") || null;
   const firstVisitDateRaw = String(formData.get("firstVisitDate") || "");
+  const dobRaw = String(formData.get("dob") || "");
   const rankRaw = String(formData.get("rank") || "");
   const initialVisitCountRaw = String(formData.get("initialVisitCount") || "");
   const initialVisitCountInput = initialVisitCountRaw ? parseInt(initialVisitCountRaw, 10) : 0;
@@ -68,6 +69,7 @@ export async function createClient(formData: FormData) {
       acquisitionChannelId,
       primaryStaffId,
       firstVisitDate: firstVisitDateRaw ? new Date(firstVisitDateRaw) : null,
+      dob: dobRaw ? new Date(dobRaw) : null,
       rank: rankRaw ? (rankRaw as ClientRank) : null,
       initialVisitCount,
       personalData: String(formData.get("personalData") || "") || null,

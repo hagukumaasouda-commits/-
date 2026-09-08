@@ -46,6 +46,11 @@ function fmtDate(d: Date | null) {
   return d ? d.toISOString().slice(0, 10) : "—";
 }
 
+function isBirthdayMonth(dob: Date | null) {
+  if (!dob) return false;
+  return dob.getUTCMonth() === new Date().getUTCMonth();
+}
+
 const severityStyle: Record<string, string> = {
   INFO: "bg-stone-100 text-stone-600",
   NOTICE: "bg-sky-100 text-sky-800",
@@ -117,6 +122,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <h1 className="text-xl font-semibold text-stone-900">
             {client.name}
             {!client.isActive && <span className="ml-2 rounded bg-stone-100 px-2 py-0.5 text-xs align-middle text-stone-500">離脱</span>}
+            {isBirthdayMonth(client.dob) && (
+              <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs align-middle text-amber-800">今月お誕生日</span>
+            )}
           </h1>
           <p className="text-sm text-stone-500 mt-1">{client.kana}</p>
         </div>
@@ -164,6 +172,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           )}
           <dl className="flex flex-col gap-2 text-sm">
             <Row label="顧客番号" value={client.externalCustomerNo ?? "—"} />
+            <Row label="生年月日" value={fmtDate(client.dob)} />
             <Row label="ランク" value={client.rank ?? "—"} />
             <Row label="性別" value={client.gender ?? "—"} />
             <Row label="電話" value={client.phone ?? "—"} />

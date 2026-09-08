@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { getDashboardReport, granularityToPeriod } from "@/lib/reports";
+import { getDashboardReport, granularityToPeriod, getBirthdayClientsThisMonth } from "@/lib/reports";
 
 function fmtDate(d: Date) {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+function fmtBirthday(d: Date) {
+  return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日`;
 }
 function fmtPct(n: number | null) {
   return n === null ? "—" : `${Math.round(n * 100)}%`;
@@ -27,7 +30,7 @@ export default async function DashboardPage({
   const granularity: "week" | "month" = sp.granularity === "week" ? "week" : "month";
   const reference = sp.ref ? new Date(sp.ref) : new Date();
   const period = granularityToPeriod(granularity, reference);
-  const report = await getDashboardReport(period);
+  const [report, birthdayClients] = await Promise.all([getDashboardReport(period), getBirthdayClientsThisMonth()]);
 
   const prevHref = `/dashboard?granularity=${granularity}&ref=${shiftReference(reference, granularity, -1)}`;
   const nextHref = `/dashboard?granularity=${granularity}&ref=${shiftReference(reference, granularity, 1)}`;
@@ -76,6 +79,24 @@ export default async function DashboardPage({
         <StatCard label="平均通院回数" value={fmtNum(report.averageVisitStats.avgVisitCount)} sub="回" />
         <StatCard label="平均通院期間" value={report.averageVisitStats.avgVisitSpanDays !== null ? Math.round(report.averageVisitStats.avgVisitSpanDays) : "—"} sub="日(2回目以降の顧客)" />
       </div>
+
+      {birthdayClients.length > 0 && (
+        <section className="rounded-lg border border-amber-300 bg-amber-50 p-5">
+          <h2 className="font-semibold text-amber-900">今月のお誕生日</h2>
+          <p className="text-sm text-amber-800 mt-1">今月が誕生月の顧客です。来店時の声かけの参考にしてください。</p>
+          <ul className="mt-3 flex flex-col gap-1 text-sm">
+            {birthdayClients.map((c) => (
+              <li key={c.clientId} className="flex justify-between">
+                <Link href={`/clients/${c.clientId}`} className="text-amber-900 underline">
+                  {c.clientName}
+                  {!c.isActive && <span className="ml-2 text-xs text-amber-700">(離脱)</span>}
+                </Link>
+                <span className="tabular-nums text-amber-800">{fmtBirthday(c.dob)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {report.prepaidDrain.length > 0 && (
         <section className="rounded-lg border border-amber-300 bg-amber-50 p-5">
