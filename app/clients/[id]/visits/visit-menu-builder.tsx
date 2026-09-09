@@ -11,15 +11,23 @@ export function VisitMenuBuilder({
   menuPlanOptions,
   chiefComplaintTags,
   treatmentModalityItems,
+  defaultMenuPlan = "",
+  defaultTags = [],
+  defaultModalities = [],
+  defaultOverride = "",
 }: {
   menuPlanOptions: { value: MenuPlan; label: string }[];
   chiefComplaintTags: readonly string[];
   treatmentModalityItems: readonly string[];
+  defaultMenuPlan?: string;
+  defaultTags?: string[];
+  defaultModalities?: string[];
+  defaultOverride?: string;
 }) {
-  const [menuPlan, setMenuPlan] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
-  const [modalities, setModalities] = useState<string[]>([]);
-  const [override, setOverride] = useState("");
+  const [menuPlan, setMenuPlan] = useState(defaultMenuPlan);
+  const [tags, setTags] = useState<string[]>(defaultTags);
+  const [modalities, setModalities] = useState<string[]>(defaultModalities);
+  const [override, setOverride] = useState(defaultOverride);
 
   const planLabel = menuPlanOptions.find((o) => o.value === menuPlan)?.label ?? "";
   const hasSelection = menuPlan !== "" || tags.length > 0 || modalities.length > 0;

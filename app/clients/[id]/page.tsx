@@ -608,7 +608,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <h2 className="font-semibold mb-3">来院タイムライン</h2>
         <ul className="flex flex-col divide-y divide-stone-100">
           {client.visits.slice(0, 10).map((v) => (
-            <VisitTimelineItem key={v.id} v={v} />
+            <VisitTimelineItem key={v.id} v={v} clientId={client.id} />
           ))}
         </ul>
         {client.visits.length > 10 && (
@@ -616,7 +616,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <summary className="cursor-pointer text-sm text-emerald-800">もっと見る({client.visits.length - 10}件)</summary>
             <ul className="mt-2 flex flex-col divide-y divide-stone-100">
               {client.visits.slice(10).map((v) => (
-                <VisitTimelineItem key={v.id} v={v} />
+                <VisitTimelineItem key={v.id} v={v} clientId={client.id} />
               ))}
             </ul>
           </details>
@@ -653,7 +653,7 @@ type VisitWithChart = {
   } | null;
 };
 
-function VisitTimelineItem({ v }: { v: VisitWithChart }) {
+function VisitTimelineItem({ v, clientId }: { v: VisitWithChart; clientId: string }) {
   return (
     <li className="py-3">
       <details>
@@ -665,45 +665,64 @@ function VisitTimelineItem({ v }: { v: VisitWithChart }) {
               <span className="ml-2 text-stone-400">{v.chartRecord.chiefComplaintTags.join("、")}</span>
             )}
           </span>
-          {v.awarenessChecks.length > 0 && <span className="text-xs text-stone-400">気づき{v.awarenessChecks.length}件</span>}
+          <span className="flex items-center gap-2">
+            {v.chartRecord?.nextCheck && (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                次回確認あり
+              </span>
+            )}
+            {v.awarenessChecks.length > 0 && <span className="text-xs text-stone-400">気づき{v.awarenessChecks.length}件</span>}
+          </span>
         </summary>
         {v.chartRecord && (
-          <div className="mt-2 grid gap-1 pl-2 text-xs text-stone-600 border-l-2 border-stone-100">
-            {v.chartRecord.menuPlan && <p>本日のメニュー(プラン): {menuPlanLabel[v.chartRecord.menuPlan]}</p>}
-            {v.chartRecord.treatmentModalities != null && (
-              <p>
-                物療チェック:{" "}
-                {Object.entries(v.chartRecord.treatmentModalities as Record<string, boolean>)
-                  .filter(([, done]) => done)
-                  .map(([item]) => item)
-                  .join("、") || "実施項目なし"}
+          <div className="mt-2 flex flex-col gap-2 pl-2 border-l-2 border-stone-100">
+            <Link
+              href={`/clients/${clientId}/visits/${v.id}/edit`}
+              className="text-xs text-emerald-800 underline w-fit"
+            >
+              この記録を修正する
+            </Link>
+            {v.chartRecord.nextCheck && (
+              <p className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-sm font-semibold text-amber-900">
+                次回確認: {v.chartRecord.nextCheck}
               </p>
             )}
-            {v.chartRecord.chiefComplaintTags.length > 0 && <p>主訴: {v.chartRecord.chiefComplaintTags.join("、")}</p>}
-            {v.chartRecord.bodyPartTags.length > 0 && <p>部位: {v.chartRecord.bodyPartTags.join("、")}</p>}
-            {v.chartRecord.evaluation && <p>評価: {v.chartRecord.evaluation}</p>}
-            {v.chartRecord.changeFromLast && <p>前回からの変化: {v.chartRecord.changeFromLast}</p>}
-            {v.chartRecord.clientVoice && <p>お客様の声: {v.chartRecord.clientVoice}</p>}
-            {v.chartRecord.nextCheck && <p>次回確認: {v.chartRecord.nextCheck}</p>}
-            {v.chartRecord.nextRequired && <p>次回必須: {v.chartRecord.nextRequired}</p>}
-            {v.chartRecord.healthPracticeNote && <p>健康実践状況: {v.chartRecord.healthPracticeNote}</p>}
-            {v.chartRecord.lifestyleSupportStatus != null && (
-              <p>
-                生活習慣サポート:{" "}
-                {Object.entries(v.chartRecord.lifestyleSupportStatus as Record<string, boolean>)
-                  .filter(([, done]) => done)
-                  .map(([item]) => item)
-                  .join("、") || "実施項目なし"}
-              </p>
-            )}
-            {v.chartRecord.healthHappinessScore && <p>回復度: {healthHappinessScoreLabel[v.chartRecord.healthHappinessScore]}</p>}
-            {v.chartRecord.testimonialObtained && (
-              <p>
-                口コミ取得
-                {v.chartRecord.testimonialObtainedDate && `(${fmtDate(v.chartRecord.testimonialObtainedDate)})`}
-              </p>
-            )}
-            {v.chartRecord.referralGiven && <p>紹介あり({v.chartRecord.referralCount ?? 1}人)</p>}
+            <div className="grid gap-1 text-xs text-stone-600">
+              {v.chartRecord.menuPlan && <p>本日のメニュー(プラン): {menuPlanLabel[v.chartRecord.menuPlan]}</p>}
+              {v.chartRecord.treatmentModalities != null && (
+                <p>
+                  物療チェック:{" "}
+                  {Object.entries(v.chartRecord.treatmentModalities as Record<string, boolean>)
+                    .filter(([, done]) => done)
+                    .map(([item]) => item)
+                    .join("、") || "実施項目なし"}
+                </p>
+              )}
+              {v.chartRecord.chiefComplaintTags.length > 0 && <p>主訴: {v.chartRecord.chiefComplaintTags.join("、")}</p>}
+              {v.chartRecord.bodyPartTags.length > 0 && <p>部位: {v.chartRecord.bodyPartTags.join("、")}</p>}
+              {v.chartRecord.evaluation && <p>評価: {v.chartRecord.evaluation}</p>}
+              {v.chartRecord.changeFromLast && <p>前回からの変化: {v.chartRecord.changeFromLast}</p>}
+              {v.chartRecord.clientVoice && <p>お客様の声: {v.chartRecord.clientVoice}</p>}
+              {v.chartRecord.nextRequired && <p>次回必須: {v.chartRecord.nextRequired}</p>}
+              {v.chartRecord.healthPracticeNote && <p>健康実践状況: {v.chartRecord.healthPracticeNote}</p>}
+              {v.chartRecord.lifestyleSupportStatus != null && (
+                <p>
+                  生活習慣サポート:{" "}
+                  {Object.entries(v.chartRecord.lifestyleSupportStatus as Record<string, boolean>)
+                    .filter(([, done]) => done)
+                    .map(([item]) => item)
+                    .join("、") || "実施項目なし"}
+                </p>
+              )}
+              {v.chartRecord.healthHappinessScore && <p>回復度: {healthHappinessScoreLabel[v.chartRecord.healthHappinessScore]}</p>}
+              {v.chartRecord.testimonialObtained && (
+                <p>
+                  口コミ取得
+                  {v.chartRecord.testimonialObtainedDate && `(${fmtDate(v.chartRecord.testimonialObtainedDate)})`}
+                </p>
+              )}
+              {v.chartRecord.referralGiven && <p>紹介あり({v.chartRecord.referralCount ?? 1}人)</p>}
+            </div>
           </div>
         )}
       </details>
