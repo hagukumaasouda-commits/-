@@ -10,6 +10,7 @@ import { recordPrepaidTransaction } from "@/app/actions/prepaid";
 import { recordProductSale } from "@/app/actions/products";
 import { setNextAppointment, cancelNextAppointment } from "@/app/actions/appointments";
 import { getClientPurchaseHistory } from "@/lib/product-reports";
+import { DeleteVisitButton } from "./visits/delete-visit-button";
 import {
   VISIT_INTERVAL_LABEL as visitIntervalLabel,
   HEALTH_HAPPINESS_LABEL as healthHappinessScoreLabel,
@@ -705,12 +706,15 @@ function VisitTimelineItem({ v, clientId }: { v: VisitWithChart; clientId: strin
         </summary>
         {v.chartRecord && (
           <div className="mt-2 flex flex-col gap-2 pl-2 border-l-2 border-stone-100">
-            <Link
-              href={`/clients/${clientId}/visits/${v.id}/edit`}
-              className="text-xs text-emerald-800 underline w-fit"
-            >
-              この記録を修正する
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/clients/${clientId}/visits/${v.id}/edit`}
+                className="text-xs text-emerald-800 underline w-fit"
+              >
+                この記録を修正する
+              </Link>
+              <DeleteVisitButton visitId={v.id} visitNo={v.visitNo} />
+            </div>
             {v.chartRecord.nextCheck && (
               <p className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-sm font-semibold text-amber-900">
                 次回確認: {v.chartRecord.nextCheck}

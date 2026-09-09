@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { VisitInterval, HealthHappinessScore, ClientRank, MenuPlan } from "@/app/generated/prisma/client";
 import { LIFESTYLE_SUPPORT_ITEMS, TREATMENT_MODALITY_ITEMS } from "@/lib/tags";
@@ -210,4 +211,54 @@ export async function updateVisit(visitId: string, formData: FormData) {
   });
 
   redirect(`/clients/${clientId}`);
+}
+
+/**
+ * 誤って同じ日に二重入力してしまった来院記録を削除する。
+ * ランクはClientの現在値のみを保持し履歴を持たないため、削除しても復元できない
+ * (updateVisitと同じ制約)。紹介人数は増分の取り消しとしてClient.referralCountに反映する。
+ * 後続の来院のvisitNoを詰め、初回来院(visitNo===1)を削除した場合はfirstVisitDateを
+ * 繰り上がった新しい初回来院の日付に更新する(残り0件ならnullに戻す)。
+ */
+export async function deleteVisit(visitId: string) {
+  const visit = await prisma.visit.findUnique({
+    where: { id: visitId },
+    select: {
+      clientId: true,
+      visitNo: true,
+      chartRecord: { select: { referralGiven: true, referralCount: true } },
+    },
+  });
+  if (!visit) throw new Error("来院記録が見つかりません");
+  const { clientId, visitNo } = visit;
+  const referralCountDelta = visit.chartRecord?.referralGiven ? -(visit.chartRecord.referralCount ?? 1) : 0;
+
+  await prisma.$transaction(async (tx) => {
+    const checks = await tx.awarenessCheck.findMany({ where: { visitId }, select: { id: true } });
+    const checkIds = checks.map((c) => c.id);
+    if (checkIds.length > 0) {
+      await tx.awarenessDialogue.deleteMany({ where: { awarenessCheckId: { in: checkIds } } });
+      await tx.awarenessCheck.deleteMany({ where: { id: { in: checkIds } } });
+    }
+    await tx.staffMindsetCheck.deleteMany({ where: { visitId } });
+    // プリカ取引は実際の入出金記録なので削除せず、この来院への参照だけを外す
+    await tx.prepaidTransaction.updateMany({ where: { visitId }, data: { visitId: null } });
+    await tx.chartRecord.deleteMany({ where: { visitId } });
+    await tx.visit.delete({ where: { id: visitId } });
+    await tx.visit.updateMany({
+      where: { clientId, visitNo: { gt: visitNo } },
+      data: { visitNo: { decrement: 1 } },
+    });
+
+    if (referralCountDelta !== 0) {
+      await tx.client.update({ where: { id: clientId }, data: { referralCount: { increment: referralCountDelta } } });
+    }
+
+    if (visitNo === 1) {
+      const newFirstVisit = await tx.visit.findFirst({ where: { clientId }, orderBy: { visitNo: "asc" } });
+      await tx.client.update({ where: { id: clientId }, data: { firstVisitDate: newFirstVisit?.visitDate ?? null } });
+    }
+  });
+
+  revalidatePath(`/clients/${clientId}`);
 }
