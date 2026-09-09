@@ -71,8 +71,18 @@ export default async function DashboardPage({
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         <StatCard label="新規来院数" value={report.newVisits} />
         <StatCard label="離脱数(6週間以上・予約なし)" value={report.churned} tone={report.churned > 0 ? "warn" : "default"} />
+        <StatCard
+          label="離脱率"
+          value={fmtPct(report.overallChurnRate.rate)}
+          sub={`${report.overallChurnRate.churnedClients}/${report.overallChurnRate.totalClients}人`}
+          tone={report.churned > 0 ? "warn" : "default"}
+        />
         <StatCard label="再診数(離脱後の復帰)" value={report.returnVisits} />
-        <StatCard label="6回以上リピーター" value={report.repeaters6plus} />
+        <StatCard
+          label="6回以上リピーター率"
+          value={fmtPct(report.repeaterRate6plus.rate)}
+          sub={`${report.repeaterRate6plus.repeaterClients}/${report.repeaterRate6plus.totalClients}人`}
+        />
         <StatCard label="15回以上リピーター" value={report.repeaters15plus} />
         <StatCard label="初回→2回目移行率" value={fmtPct(report.secondVisitConversion.rate)} sub={`${report.secondVisitConversion.converted}/${report.secondVisitConversion.cohortSize}人`} />
         <StatCard label="紹介率" value={fmtPct(report.referral.rate)} sub={`紹介 ${report.referral.referred}/${report.referral.cohortSize}人`} />
@@ -119,23 +129,29 @@ export default async function DashboardPage({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-lg border border-stone-200 bg-white p-5">
-          <h2 className="font-semibold mb-3">スタッフ別担当患者数・リピート率</h2>
+          <h2 className="font-semibold mb-3">スタッフ別担当患者数・リピート率・離脱率</h2>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-stone-500 border-b border-stone-200">
                 <th className="py-1.5 font-normal">スタッフ</th>
                 <th className="py-1.5 font-normal text-right">担当数</th>
                 <th className="py-1.5 font-normal text-right">リピート率</th>
+                <th className="py-1.5 font-normal text-right">6回以上リピート率</th>
+                <th className="py-1.5 font-normal text-right">離脱率</th>
               </tr>
             </thead>
             <tbody>
               {report.staffCaseload.map((s) => {
                 const rr = report.staffRepeatRate.find((r) => r.staffId === s.staffId);
+                const rr6 = report.staffRepeaterRate6plus.find((r) => r.staffId === s.staffId);
+                const cr = report.staffChurnRate.find((r) => r.staffId === s.staffId);
                 return (
                   <tr key={s.staffId} className="border-b border-stone-100 last:border-0">
                     <td className="py-1.5">{s.staffName}</td>
                     <td className="py-1.5 text-right tabular-nums">{s.clientCount}</td>
                     <td className="py-1.5 text-right tabular-nums">{fmtPct(rr?.repeatRate ?? null)}</td>
+                    <td className="py-1.5 text-right tabular-nums">{fmtPct(rr6?.rate ?? null)}</td>
+                    <td className="py-1.5 text-right tabular-nums">{fmtPct(cr?.rate ?? null)}</td>
                   </tr>
                 );
               })}

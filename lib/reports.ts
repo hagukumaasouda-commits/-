@@ -140,6 +140,104 @@ export async function countRepeatersAtLeast(period: ReportPeriod, minVisits: num
   return count;
 }
 
+/** 全体の離脱率(期間終了時点で在籍する全顧客のうち、離脱扱いになっている割合) */
+export async function getOverallChurnRate(period: ReportPeriod) {
+  const asOf = asOfNow(period);
+  const [totalClients, churnedIds] = await Promise.all([
+    prisma.client.count({ where: { firstVisitDate: { lte: asOf } } }),
+    getChurnedClientIds(asOf),
+  ]);
+  return {
+    totalClients,
+    churnedClients: churnedIds.length,
+    rate: totalClients > 0 ? churnedIds.length / totalClients : null,
+  };
+}
+
+/** スタッフ別離脱率(担当顧客のうち離脱扱いになっている割合) */
+export async function getStaffChurnRate(period: ReportPeriod) {
+  const asOf = asOfNow(period);
+  const [clients, churnedIds, staff] = await Promise.all([
+    prisma.client.findMany({
+      where: { firstVisitDate: { lte: asOf }, primaryStaffId: { not: null } },
+      select: { id: true, primaryStaffId: true },
+    }),
+    getChurnedClientIds(asOf),
+    prisma.staff.findMany({ select: { id: true, name: true } }),
+  ]);
+  const churnedSet = new Set(churnedIds);
+  const nameOf = new Map(staff.map((s) => [s.id, s.name]));
+
+  const byStaff = new Map<string, { total: number; churned: number }>();
+  for (const c of clients) {
+    const key = c.primaryStaffId!;
+    const cur = byStaff.get(key) ?? { total: 0, churned: 0 };
+    cur.total++;
+    if (churnedSet.has(c.id)) cur.churned++;
+    byStaff.set(key, cur);
+  }
+
+  return Array.from(byStaff.entries())
+    .map(([staffId, v]) => ({
+      staffId,
+      staffName: nameOf.get(staffId) ?? "(不明)",
+      totalClients: v.total,
+      churnedClients: v.churned,
+      rate: v.total > 0 ? v.churned / v.total : null,
+    }))
+    .sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0));
+}
+
+/** 全体のn回以上リピーター率(期間終了時点で在籍する全顧客のうち、n回以上来店した割合) */
+export async function getRepeaterRateAtLeast(period: ReportPeriod, minVisits: number) {
+  const asOf = asOfNow(period);
+  const [totalClients, stats] = await Promise.all([
+    prisma.client.count({ where: { firstVisitDate: { lte: asOf } } }),
+    getVisitStatsAsOf(asOf),
+  ]);
+  let repeaterClients = 0;
+  for (const s of stats.values()) if (s.visitCount >= minVisits) repeaterClients++;
+  return {
+    totalClients,
+    repeaterClients,
+    rate: totalClients > 0 ? repeaterClients / totalClients : null,
+  };
+}
+
+/** スタッフ別n回以上リピーター率(担当顧客のうち、n回以上来店した割合) */
+export async function getStaffRepeaterRateAtLeast(period: ReportPeriod, minVisits: number) {
+  const asOf = asOfNow(period);
+  const [clients, stats, staff] = await Promise.all([
+    prisma.client.findMany({
+      where: { firstVisitDate: { lte: asOf }, primaryStaffId: { not: null } },
+      select: { id: true, primaryStaffId: true },
+    }),
+    getVisitStatsAsOf(asOf),
+    prisma.staff.findMany({ select: { id: true, name: true } }),
+  ]);
+  const nameOf = new Map(staff.map((s) => [s.id, s.name]));
+
+  const byStaff = new Map<string, { total: number; repeaters: number }>();
+  for (const c of clients) {
+    const s = stats.get(c.id);
+    const key = c.primaryStaffId!;
+    const cur = byStaff.get(key) ?? { total: 0, repeaters: 0 };
+    cur.total++;
+    if (s && s.visitCount >= minVisits) cur.repeaters++;
+    byStaff.set(key, cur);
+  }
+
+  return Array.from(byStaff.entries())
+    .map(([staffId, v]) => ({
+      staffId,
+      staffName: nameOf.get(staffId) ?? "(不明)",
+      totalClients: v.total,
+      repeaterClients: v.repeaters,
+      rate: v.total > 0 ? v.repeaters / v.total : null,
+    }))
+    .sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0));
+}
+
 /** 5. スタッフごとの担当患者数(期間終了時点の在籍顧客ベース) */
 export async function getStaffCaseload(period: ReportPeriod) {
   const rows = await prisma.client.groupBy({
@@ -387,8 +485,12 @@ export async function getDashboardReport(period: ReportPeriod) {
   const [
     newVisits,
     churned,
+    overallChurnRate,
+    staffChurnRate,
     repeaters6plus,
     repeaters15plus,
+    repeaterRate6plus,
+    staffRepeaterRate6plus,
     staffCaseload,
     channelBreakdown,
     secondVisitConversion,
@@ -401,8 +503,12 @@ export async function getDashboardReport(period: ReportPeriod) {
   ] = await Promise.all([
     countNewVisits(period),
     countChurned(period),
+    getOverallChurnRate(period),
+    getStaffChurnRate(period),
     countRepeatersAtLeast(period, 6),
     countRepeatersAtLeast(period, 15),
+    getRepeaterRateAtLeast(period, 6),
+    getStaffRepeaterRateAtLeast(period, 6),
     getStaffCaseload(period),
     getChannelBreakdown(period),
     getSecondVisitConversionRate(period),
@@ -418,8 +524,12 @@ export async function getDashboardReport(period: ReportPeriod) {
     period,
     newVisits,
     churned,
+    overallChurnRate,
+    staffChurnRate,
     repeaters6plus,
     repeaters15plus,
+    repeaterRate6plus,
+    staffRepeaterRate6plus,
     staffCaseload,
     channelBreakdown,
     secondVisitConversion,
