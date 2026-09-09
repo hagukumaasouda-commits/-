@@ -671,6 +671,11 @@ function VisitTimelineItem({ v, clientId }: { v: VisitWithChart; clientId: strin
                 次回確認あり
               </span>
             )}
+            {v.chartRecord?.nextRequired && (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                次回必須あり
+              </span>
+            )}
             {v.awarenessChecks.length > 0 && <span className="text-xs text-stone-400">気づき{v.awarenessChecks.length}件</span>}
           </span>
         </summary>
@@ -685,6 +690,11 @@ function VisitTimelineItem({ v, clientId }: { v: VisitWithChart; clientId: strin
             {v.chartRecord.nextCheck && (
               <p className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-sm font-semibold text-amber-900">
                 次回確認: {v.chartRecord.nextCheck}
+              </p>
+            )}
+            {v.chartRecord.nextRequired && (
+              <p className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-sm font-semibold text-amber-900">
+                次回必須: {v.chartRecord.nextRequired}
               </p>
             )}
             <div className="grid gap-1 text-xs text-stone-600">
@@ -703,7 +713,6 @@ function VisitTimelineItem({ v, clientId }: { v: VisitWithChart; clientId: strin
               {v.chartRecord.evaluation && <p>評価: {v.chartRecord.evaluation}</p>}
               {v.chartRecord.changeFromLast && <p>前回からの変化: {v.chartRecord.changeFromLast}</p>}
               {v.chartRecord.clientVoice && <p>お客様の声: {v.chartRecord.clientVoice}</p>}
-              {v.chartRecord.nextRequired && <p>次回必須: {v.chartRecord.nextRequired}</p>}
               {v.chartRecord.healthPracticeNote && <p>健康実践状況: {v.chartRecord.healthPracticeNote}</p>}
               {v.chartRecord.lifestyleSupportStatus != null && (
                 <p>
