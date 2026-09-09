@@ -47,6 +47,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/products" className="hover:text-emerald-800">
                     物販売上
                   </Link>
+                  <Link href="/treatment-modalities" className="hover:text-emerald-800">
+                    物療集計
+                  </Link>
                 </nav>
                 <div className="ml-auto flex items-center gap-3 text-sm text-stone-500">
                   <span>{session.user.name} さん</span>
