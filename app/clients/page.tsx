@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
+type SortDir = "asc" | "desc";
+
 export default async function ClientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string; dir?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, sort, dir } = await searchParams;
+  const isSortedByCustomerNo = sort === "customerNo";
+  const customerNoDir: SortDir = dir === "desc" ? "desc" : "asc";
+  const nextCustomerNoDir: SortDir = isSortedByCustomerNo && customerNoDir === "asc" ? "desc" : "asc";
 
   const clients = await prisma.client.findMany({
     where: q
@@ -18,14 +23,23 @@ export default async function ClientsPage({
       _count: { select: { visits: true } },
       visits: { orderBy: { visitNo: "desc" }, take: 1, select: { visitDate: true } },
     },
-    orderBy: { firstVisitDate: "desc" },
+    orderBy: isSortedByCustomerNo
+      ? { externalCustomerNo: { sort: customerNoDir, nulls: "last" } }
+      : { firstVisitDate: "desc" },
   });
+
+  const sortLinkParams = new URLSearchParams();
+  if (q) sortLinkParams.set("q", q);
+  sortLinkParams.set("sort", "customerNo");
+  sortLinkParams.set("dir", nextCustomerNoDir);
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-stone-900">顧客一覧</h1>
         <form className="flex gap-2">
+          {isSortedByCustomerNo && <input type="hidden" name="sort" value="customerNo" />}
+          {isSortedByCustomerNo && <input type="hidden" name="dir" value={customerNoDir} />}
           <input
             type="text"
             name="q"
@@ -42,7 +56,17 @@ export default async function ClientsPage({
           <thead>
             <tr className="border-b border-stone-200 text-left text-stone-500">
               <th className="px-4 py-2 font-normal">氏名</th>
-              <th className="px-4 py-2 font-normal">顧客番号</th>
+              <th className="px-4 py-2 font-normal">
+                <Link
+                  href={`/clients?${sortLinkParams.toString()}`}
+                  className="inline-flex items-center gap-1 hover:text-emerald-800"
+                >
+                  顧客番号
+                  <span className="text-xs">
+                    {isSortedByCustomerNo ? (customerNoDir === "asc" ? "▲" : "▼") : "▲▼"}
+                  </span>
+                </Link>
+              </th>
               <th className="px-4 py-2 font-normal">担当</th>
               <th className="px-4 py-2 font-normal">来店経路</th>
               <th className="px-4 py-2 font-normal text-right">来院回数</th>
