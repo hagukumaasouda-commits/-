@@ -179,6 +179,15 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
         <Field label="個人データ">
           <textarea name="personalData" rows={3} defaultValue={client.personalData ?? ""} className="input" />
         </Field>
+        <Field label="顕在ニーズ">
+          <textarea name="manifestNeed" rows={2} defaultValue={client.manifestNeed ?? ""} className="input" placeholder="今困っていること" />
+        </Field>
+        <Field label="深層ニーズ">
+          <textarea name="deepNeed" rows={2} defaultValue={client.deepNeed ?? ""} className="input" placeholder="本当のお困りごと" />
+        </Field>
+        <Field label="ウォンツ">
+          <textarea name="wants" rows={2} defaultValue={client.wants ?? ""} className="input" placeholder="どうなったら嬉しいか" />
+        </Field>
 
         <button type="submit" className="mt-2 rounded-md bg-emerald-800 px-4 py-2 text-sm font-medium text-white w-fit">
           保存する

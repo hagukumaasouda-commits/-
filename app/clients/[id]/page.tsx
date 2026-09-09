@@ -141,7 +141,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="rounded-lg border border-stone-200 bg-white p-5 lg:col-span-1">
           <h2 className="font-semibold mb-3">基本情報</h2>
-          {(client.medicalHistory || client.familyData || client.personalData || latestVisit?.chartRecord?.healthPracticeNote) && (
+          {(client.medicalHistory ||
+            client.familyData ||
+            client.personalData ||
+            client.manifestNeed ||
+            client.deepNeed ||
+            client.wants ||
+            latestVisit?.chartRecord?.healthPracticeNote) && (
             <div className="mb-3 flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50/40 p-3 text-sm">
               <p className="text-xs font-medium text-amber-800">施術前に毎回確認</p>
               {client.medicalHistory && (
@@ -160,6 +166,24 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 <p>
                   <span className="text-stone-500">個人データ: </span>
                   {client.personalData}
+                </p>
+              )}
+              {client.manifestNeed && (
+                <p>
+                  <span className="text-stone-500">顕在ニーズ: </span>
+                  {client.manifestNeed}
+                </p>
+              )}
+              {client.deepNeed && (
+                <p>
+                  <span className="text-stone-500">深層ニーズ: </span>
+                  {client.deepNeed}
+                </p>
+              )}
+              {client.wants && (
+                <p>
+                  <span className="text-stone-500">ウォンツ: </span>
+                  {client.wants}
                 </p>
               )}
               {latestVisit?.chartRecord?.healthPracticeNote && (

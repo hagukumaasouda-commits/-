@@ -97,6 +97,12 @@ model Client {
   familyData     String? // 家族データ(自由記述)
   personalData   String? // 個人データ(自由記述)
 
+  // カウンセリングOS(顕在ニーズ→深層ニーズ→ウォンツ→自己認識)の入り口(docs/needs-spec-v2.md)。
+  // 既往・家族データ・個人データと同じ性質(顧客単位・自由記述・通院の中で更新されうる)のフィールドとして扱う。
+  manifestNeed String? // 顕在ニーズ(今困っていること)
+  deepNeed     String? // 深層ニーズ(本当のお困りごと)
+  wants        String? // ウォンツ(どうなったら嬉しいか)
+
   rank ClientRank? // ランク。顧客登録・編集画面、および来院のたびに来院記録フォームからも更新できる(現状値のみ保持、履歴は持たない)
 
   nextAppointmentDate DateTime? // 次回予約日。会計時などにスタッフが手動入力(予約CSV取り込みとは別の独立したデータ)

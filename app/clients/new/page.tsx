@@ -151,6 +151,15 @@ export default async function NewClientPage() {
         <Field label="個人データ">
           <textarea name="personalData" rows={3} className="input" />
         </Field>
+        <Field label="顕在ニーズ">
+          <textarea name="manifestNeed" rows={2} className="input" placeholder="今困っていること" />
+        </Field>
+        <Field label="深層ニーズ">
+          <textarea name="deepNeed" rows={2} className="input" placeholder="本当のお困りごと" />
+        </Field>
+        <Field label="ウォンツ">
+          <textarea name="wants" rows={2} className="input" placeholder="どうなったら嬉しいか" />
+        </Field>
         <button type="submit" className="mt-2 rounded-md bg-emerald-800 px-4 py-2 text-sm font-medium text-white w-fit">
           登録する
         </button>
