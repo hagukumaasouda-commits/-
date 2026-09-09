@@ -229,6 +229,8 @@ enum MenuPlan {
   REPAIRNESS_PLAN // リペアネスプラン
   CONDITIONING_PLAN // コンディショニングプラン
   WELLNESS_PLAN // ウェルネスプラン
+  LIGHT // ライト
+  JIBAISEKI_TREATMENT // 自賠責治療(自賠責保険への保険請求のため、会員/一般価格は無し)
 }
 
 enum VisitInterval {

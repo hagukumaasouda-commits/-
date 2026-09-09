@@ -39,12 +39,15 @@ export const BODY_PART_TAGS = [
 ] as const;
 
 // 施術メニュー表(参考価格。表示のみ、会計計算には連動させない)。
-export const TREATMENT_MENU = [
+// 自賠責治療は自賠責保険への保険請求のため会員/一般価格が無く、価格欄には注記のみ表示する。
+export const TREATMENT_MENU: { name: string; memberPrice: number | null; generalPrice: number | null; note?: string }[] = [
   { name: "ベーシックケア", memberPrice: 4200, generalPrice: 4600 },
   { name: "リペアネスプラン", memberPrice: 5500, generalPrice: 6000 },
   { name: "コンディショニングプラン", memberPrice: 6800, generalPrice: 7300 },
   { name: "ウェルネスプラン", memberPrice: 8200, generalPrice: 8700 },
-] as const;
+  { name: "ライト", memberPrice: 3000, generalPrice: 3500 },
+  { name: "自賠責治療", memberPrice: null, generalPrice: null, note: "保険算定" },
+];
 
 // 本日のメニュー(プラン)。TREATMENT_MENUの名称と対応する単一の情報源。
 export const MENU_PLAN_OPTIONS: { value: MenuPlan; label: string }[] = [
@@ -52,6 +55,8 @@ export const MENU_PLAN_OPTIONS: { value: MenuPlan; label: string }[] = [
   { value: "REPAIRNESS_PLAN", label: "リペアネスプラン" },
   { value: "CONDITIONING_PLAN", label: "コンディショニングプラン" },
   { value: "WELLNESS_PLAN", label: "ウェルネスプラン" },
+  { value: "LIGHT", label: "ライト" },
+  { value: "JIBAISEKI_TREATMENT", label: "自賠責治療" },
 ];
 export const MENU_PLAN_LABEL: Record<MenuPlan, string> = Object.fromEntries(
   MENU_PLAN_OPTIONS.map((o) => [o.value, o.label])

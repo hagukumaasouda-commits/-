@@ -107,8 +107,8 @@ export function VisitForm({
               {TREATMENT_MENU.map((m) => (
                 <tr key={m.name} className="border-b border-stone-100 last:border-0">
                   <td className="py-1">{m.name}</td>
-                  <td className="py-1">{m.memberPrice.toLocaleString()}円</td>
-                  <td className="py-1">{m.generalPrice.toLocaleString()}円</td>
+                  <td className="py-1">{m.memberPrice != null ? `${m.memberPrice.toLocaleString()}円` : m.note ?? "—"}</td>
+                  <td className="py-1">{m.generalPrice != null ? `${m.generalPrice.toLocaleString()}円` : m.note ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
