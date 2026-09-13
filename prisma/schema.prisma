@@ -31,6 +31,7 @@ model Staff {
   staffMindsetChecks  StaffMindsetCheck[]
   awarenessDialogues  AwarenessDialogue[]
   productSales        ProductSale[]
+  productStockIns     ProductStockIn[]
   prepaidTransactions PrepaidTransaction[]
 
   departuresConfirmed     DepartureRecord[]     @relation("DepartureConfirmedBy")
@@ -459,14 +460,21 @@ model ClientStatusSnapshot {
 // ---------------------------------------------------------------------------
 
 model Product {
-  id           String   @id @default(cuid())
-  name         String   @unique
-  category     String?
+  id           String          @id @default(cuid())
+  name         String          @unique
+  category     ProductCategory @default(OTHER) // 歩合率がカテゴリごとに異なるため、スタッフ別売上集計の分岐キーになる
   defaultPrice Int? // 参考価格(円)。購入記録フォームの初期値に使うのみで、記録時に金額は上書き可能
-  active       Boolean  @default(true) // 取り扱い終了品を選択肢から外すためのフラグ(削除はしない)
-  createdAt    DateTime @default(now())
+  active       Boolean         @default(true) // 取り扱い終了品を選択肢から外すためのフラグ(削除はしない)
+  createdAt    DateTime        @default(now())
 
-  sales ProductSale[]
+  sales    ProductSale[]
+  stockIns ProductStockIn[]
+}
+
+enum ProductCategory {
+  RIPPLE // りっぷる商品
+  GRANT // グラント商品
+  OTHER // 他
 }
 
 enum ProductItemType {
@@ -510,6 +518,22 @@ model ProductSale {
   @@index([productId, saleDate])
   @@index([clientId])
   @@index([staffId])
+}
+
+// 仕入れ記録(在庫管理)。現在庫 = 仕入れ数量の合計 - 販売数量の合計(手入力で運用)。
+// ProductSale.quantityが無い行(CSV取り込み分の一部)は在庫計算に反映されない制約がある。
+model ProductStockIn {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  stockInDate DateTime
+  staffId     String?
+  staff       Staff?   @relation(fields: [staffId], references: [id])
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([productId, stockInDate])
 }
 
 // ---------------------------------------------------------------------------

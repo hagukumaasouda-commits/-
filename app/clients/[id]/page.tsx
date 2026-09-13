@@ -11,6 +11,7 @@ import { recordProductSale } from "@/app/actions/products";
 import { setNextAppointment, cancelNextAppointment } from "@/app/actions/appointments";
 import { getClientPurchaseHistory } from "@/lib/product-reports";
 import { DeleteVisitButton } from "./visits/delete-visit-button";
+import { ProductSaleRow } from "./product-sale-row";
 import {
   VISIT_INTERVAL_LABEL as visitIntervalLabel,
   HEALTH_HAPPINESS_LABEL as healthHappinessScoreLabel,
@@ -558,19 +559,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 <th className="py-1.5 font-normal">商品</th>
                 <th className="py-1.5 font-normal">区分</th>
                 <th className="py-1.5 font-normal text-right">金額</th>
+                <th className="py-1.5 font-normal text-right">操作</th>
               </tr>
             </thead>
             <tbody>
               {purchaseHistory.map((p) => (
-                <tr key={p.id} className="border-b border-stone-100 last:border-0">
-                  <td className="py-1.5 text-stone-600">{fmtDate(p.saleDate)}</td>
-                  <td className="py-1.5">{p.productName}</td>
-                  <td className="py-1.5 text-stone-500 text-xs">
-                    {p.itemType === "FULL" ? "本品" : "バラ"} ・ {p.purchaseType === "NEW" ? "新規" : "リピート"}
-                    {p.isGift && <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">プレゼント</span>}
-                  </td>
-                  <td className="py-1.5 text-right tabular-nums">{p.amount.toLocaleString()}円</td>
-                </tr>
+                <ProductSaleRow key={p.id} sale={p} products={activeProducts} staff={allStaff} />
               ))}
             </tbody>
           </table>

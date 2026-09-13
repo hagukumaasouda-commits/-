@@ -1,4 +1,4 @@
-import { VisitInterval, HealthHappinessScore, ClientRank, MenuPlan } from "@/app/generated/prisma/client";
+import { VisitInterval, HealthHappinessScore, ClientRank, MenuPlan, ProductCategory } from "@/app/generated/prisma/client";
 
 // カルテのタグ選択肢。集計(来院理由・部位別分布)の粒度をここで揃える。
 export const CHIEF_COMPLAINT_TAGS = [
@@ -61,6 +61,16 @@ export const MENU_PLAN_OPTIONS: { value: MenuPlan; label: string }[] = [
 export const MENU_PLAN_LABEL: Record<MenuPlan, string> = Object.fromEntries(
   MENU_PLAN_OPTIONS.map((o) => [o.value, o.label])
 ) as Record<MenuPlan, string>;
+
+// 物販商品のカテゴリ(歩合率がカテゴリごとに異なるため、スタッフ別売上集計を分ける単位になる)。
+export const PRODUCT_CATEGORY_OPTIONS: { value: ProductCategory; label: string }[] = [
+  { value: "RIPPLE", label: "りっぷる商品" },
+  { value: "GRANT", label: "グラント商品" },
+  { value: "OTHER", label: "他" },
+];
+export const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = Object.fromEntries(
+  PRODUCT_CATEGORY_OPTIONS.map((o) => [o.value, o.label])
+) as Record<ProductCategory, string>;
 
 // 物療チェック(生活習慣サポートとは別概念。新規フィールド)。
 export const TREATMENT_MODALITY_ITEMS = ["コアレ10", "コアレ20", "ブースター", "セラゼム", "鍼", "灸"] as const;

@@ -4,8 +4,10 @@ import {
   getMonthlyProductSales,
   getGiftSummary,
   getStaffProductSales,
+  getStaffProductSalesByCategory,
   getTreatmentProductCorrelation,
 } from "@/lib/product-reports";
+import { PRODUCT_CATEGORY_OPTIONS, PRODUCT_CATEGORY_LABEL } from "@/lib/tags";
 
 function fmtDate(d: Date) {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
@@ -28,10 +30,11 @@ export default async function ProductsPage({
   const reference = sp.ref ? new Date(sp.ref) : new Date();
   const period = granularityToPeriod(granularity, reference);
 
-  const [productSales, gifts, staffSales, correlation] = await Promise.all([
+  const [productSales, gifts, staffSales, staffCategorySales, correlation] = await Promise.all([
     getMonthlyProductSales(period),
     getGiftSummary(period),
     getStaffProductSales(period),
+    getStaffProductSalesByCategory(period),
     getTreatmentProductCorrelation(period),
   ]);
 
@@ -53,6 +56,9 @@ export default async function ProductsPage({
         <div className="flex items-center gap-2 text-sm">
           <Link href="/products/manage" className="rounded-md border border-stone-300 bg-white px-3 py-1.5 hover:bg-stone-100">
             商品マスタを管理
+          </Link>
+          <Link href="/products/inventory" className="rounded-md border border-stone-300 bg-white px-3 py-1.5 hover:bg-stone-100">
+            在庫管理
           </Link>
           <div className="flex rounded-md border border-stone-300 overflow-hidden">
             <Link
@@ -101,6 +107,7 @@ export default async function ProductsPage({
             <thead>
               <tr className="text-left text-stone-500 border-b border-stone-200">
                 <th className="py-1.5 font-normal">商品</th>
+                <th className="py-1.5 font-normal">カテゴリ</th>
                 <th className="py-1.5 font-normal text-right">件数</th>
                 <th className="py-1.5 font-normal text-right">金額</th>
               </tr>
@@ -109,13 +116,14 @@ export default async function ProductsPage({
               {productSales.map((p) => (
                 <tr key={p.productId} className="border-b border-stone-100 last:border-0">
                   <td className="py-1.5">{p.productName}</td>
+                  <td className="py-1.5 text-stone-500 text-xs">{p.category ? PRODUCT_CATEGORY_LABEL[p.category] : "—"}</td>
                   <td className="py-1.5 text-right tabular-nums">{p.count}</td>
                   <td className="py-1.5 text-right tabular-nums">{p.amount.toLocaleString()}円</td>
                 </tr>
               ))}
               {productSales.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="py-4 text-center text-stone-400">
+                  <td colSpan={4} className="py-4 text-center text-stone-400">
                     この期間の物販データはありません
                   </td>
                 </tr>
@@ -198,6 +206,50 @@ export default async function ProductsPage({
           </ul>
         </section>
       </div>
+
+      <section className="rounded-lg border border-stone-200 bg-white p-5">
+        <h2 className="font-semibold mb-1">スタッフ別・カテゴリ別売上</h2>
+        <p className="text-xs text-stone-500 mb-3">歩合率がカテゴリごとに異なるため、個人の売上をカテゴリで内訳表示しています(プレゼント品は除外)。</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-stone-500 border-b border-stone-200">
+                <th className="py-1.5 font-normal">スタッフ</th>
+                {PRODUCT_CATEGORY_OPTIONS.map((o) => (
+                  <th key={o.value} className="py-1.5 font-normal text-right">
+                    {o.label}
+                  </th>
+                ))}
+                <th className="py-1.5 font-normal text-right">合計</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staffCategorySales.map((s) => (
+                <tr key={s.staffId} className="border-b border-stone-100 last:border-0">
+                  <td className="py-1.5">{s.staffName}</td>
+                  {PRODUCT_CATEGORY_OPTIONS.map((o) => (
+                    <td key={o.value} className="py-1.5 text-right tabular-nums">
+                      {s.byCategory[o.value].amount.toLocaleString()}円
+                      <span className="ml-1 text-xs text-stone-400">({s.byCategory[o.value].count}件)</span>
+                    </td>
+                  ))}
+                  <td className="py-1.5 text-right font-medium tabular-nums">
+                    {s.totalAmount.toLocaleString()}円
+                    <span className="ml-1 text-xs text-stone-400 font-normal">({s.totalCount}件)</span>
+                  </td>
+                </tr>
+              ))}
+              {staffCategorySales.length === 0 && (
+                <tr>
+                  <td colSpan={PRODUCT_CATEGORY_OPTIONS.length + 2} className="py-4 text-center text-stone-400">
+                    この期間の物販データはありません
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }

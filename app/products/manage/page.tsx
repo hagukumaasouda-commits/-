@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { upsertProduct, setProductActive } from "@/app/actions/products";
+import { PRODUCT_CATEGORY_OPTIONS } from "@/lib/tags";
 
 // 追加・編集・取り扱い終了の切り替えを行うページなので、キャッシュされた
 // 静的レンダリングではなく常に最新のマスタ一覧を返す。
@@ -18,6 +19,7 @@ export default async function ManageProductsPage() {
         <h1 className="text-xl font-semibold text-stone-900 mt-2">商品マスタを管理</h1>
         <p className="text-sm text-stone-500 mt-1">
           物販購入記録フォームの「商品名」選択肢です。参考価格は購入記録時の目安表示のみで、実際の金額はその都度手入力します。
+          カテゴリ(りっぷる商品/グラント商品/他)は歩合率が異なるため、スタッフ別売上集計(物販売上ページ)の内訳に使われます。
         </p>
       </div>
 
@@ -27,8 +29,17 @@ export default async function ManageProductsPage() {
           <Field label="商品名" required>
             <input name="name" required className="input" />
           </Field>
-          <Field label="カテゴリ(任意)">
-            <input name="category" className="input" />
+          <Field label="カテゴリ" required>
+            <select name="category" required className="input" defaultValue="">
+              <option value="" disabled>
+                選択してください
+              </option>
+              {PRODUCT_CATEGORY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="参考価格(任意)">
             <input type="number" name="defaultPrice" className="input" />
@@ -48,8 +59,14 @@ export default async function ManageProductsPage() {
                 <Field label="商品名" required>
                   <input name="name" required defaultValue={p.name} className="input" />
                 </Field>
-                <Field label="カテゴリ">
-                  <input name="category" defaultValue={p.category ?? ""} className="input" />
+                <Field label="カテゴリ" required>
+                  <select name="category" required className="input" defaultValue={p.category}>
+                    {PRODUCT_CATEGORY_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
                 <Field label="参考価格">
                   <input type="number" name="defaultPrice" defaultValue={p.defaultPrice ?? ""} className="input" />
