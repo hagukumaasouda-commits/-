@@ -1,13 +1,16 @@
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 import { granularityToPeriod } from "@/lib/reports";
 import {
   getMonthlyProductSales,
   getGiftSummary,
   getStaffProductSales,
   getStaffProductSalesByCategory,
+  getProductSaleTransactions,
   getTreatmentProductCorrelation,
 } from "@/lib/product-reports";
-import { PRODUCT_CATEGORY_OPTIONS, PRODUCT_CATEGORY_LABEL } from "@/lib/tags";
+import { PRODUCT_CATEGORY_OPTIONS } from "@/lib/tags";
+import { ProductSalesTable } from "./product-sales-table";
 
 function fmtDate(d: Date) {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
@@ -30,13 +33,17 @@ export default async function ProductsPage({
   const reference = sp.ref ? new Date(sp.ref) : new Date();
   const period = granularityToPeriod(granularity, reference);
 
-  const [productSales, gifts, staffSales, staffCategorySales, correlation] = await Promise.all([
-    getMonthlyProductSales(period),
-    getGiftSummary(period),
-    getStaffProductSales(period),
-    getStaffProductSalesByCategory(period),
-    getTreatmentProductCorrelation(period),
-  ]);
+  const [productSales, gifts, staffSales, staffCategorySales, transactions, correlation, activeProducts, activeStaff] =
+    await Promise.all([
+      getMonthlyProductSales(period),
+      getGiftSummary(period),
+      getStaffProductSales(period),
+      getStaffProductSalesByCategory(period),
+      getProductSaleTransactions(period),
+      getTreatmentProductCorrelation(period),
+      prisma.product.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+      prisma.staff.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    ]);
 
   const totalAmount = productSales.reduce((s, p) => s + p.amount, 0);
   const totalCount = productSales.reduce((s, p) => s + p.count, 0);
@@ -100,38 +107,13 @@ export default async function ProductsPage({
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-lg border border-stone-200 bg-white p-5">
-          <h2 className="font-semibold mb-3">商品別売上</h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-stone-500 border-b border-stone-200">
-                <th className="py-1.5 font-normal">商品</th>
-                <th className="py-1.5 font-normal">カテゴリ</th>
-                <th className="py-1.5 font-normal text-right">件数</th>
-                <th className="py-1.5 font-normal text-right">金額</th>
-              </tr>
-            </thead>
-            <tbody>
-              {productSales.map((p) => (
-                <tr key={p.productId} className="border-b border-stone-100 last:border-0">
-                  <td className="py-1.5">{p.productName}</td>
-                  <td className="py-1.5 text-stone-500 text-xs">{p.category ? PRODUCT_CATEGORY_LABEL[p.category] : "—"}</td>
-                  <td className="py-1.5 text-right tabular-nums">{p.count}</td>
-                  <td className="py-1.5 text-right tabular-nums">{p.amount.toLocaleString()}円</td>
-                </tr>
-              ))}
-              {productSales.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="py-4 text-center text-stone-400">
-                    この期間の物販データはありません
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </section>
+      <section className="rounded-lg border border-stone-200 bg-white p-5">
+        <h2 className="font-semibold mb-1">商品別売上</h2>
+        <p className="text-xs text-stone-500 mb-3">「内訳を見る」から個々の取引を確認し、入力ミスの修正・削除ができます。</p>
+        <ProductSalesTable productSales={productSales} transactions={transactions} products={activeProducts} staff={activeStaff} />
+      </section>
 
+      <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-lg border border-stone-200 bg-white p-5">
           <h2 className="font-semibold mb-3">スタッフ別物販売上</h2>
           <table className="w-full text-sm">

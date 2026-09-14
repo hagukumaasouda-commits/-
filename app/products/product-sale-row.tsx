@@ -24,17 +24,22 @@ export function ProductSaleRow({
   sale,
   products,
   staff,
+  clientLabel,
 }: {
   sale: Sale;
   products: { id: string; name: string }[];
   staff: { id: string; name: string }[];
+  /** 指定すると顧客名の列を追加表示する(商品別売上からの入力ミス修正など、複数顧客をまたぐ一覧向け) */
+  clientLabel?: string;
 }) {
   const [editing, setEditing] = useState(false);
+  const colSpan = clientLabel !== undefined ? 6 : 5;
 
   if (!editing) {
     return (
       <tr className="border-b border-stone-100 last:border-0">
         <td className="py-1.5 text-stone-600">{fmtDate(sale.saleDate)}</td>
+        {clientLabel !== undefined && <td className="py-1.5">{clientLabel}</td>}
         <td className="py-1.5">{sale.productName}</td>
         <td className="py-1.5 text-stone-500 text-xs">
           {sale.itemType === "FULL" ? "本品" : "バラ"} ・ {sale.purchaseType === "NEW" ? "新規" : "リピート"}
@@ -65,7 +70,7 @@ export function ProductSaleRow({
 
   return (
     <tr className="border-b border-stone-100 last:border-0 bg-stone-50">
-      <td colSpan={5} className="py-2">
+      <td colSpan={colSpan} className="py-2">
         <form
           action={async (formData) => {
             await updateProductSale(sale.id, formData);

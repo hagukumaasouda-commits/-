@@ -11,7 +11,7 @@ import { recordProductSale } from "@/app/actions/products";
 import { setNextAppointment, cancelNextAppointment } from "@/app/actions/appointments";
 import { getClientPurchaseHistory } from "@/lib/product-reports";
 import { DeleteVisitButton } from "./visits/delete-visit-button";
-import { ProductSaleRow } from "./product-sale-row";
+import { ProductSaleRow } from "@/app/products/product-sale-row";
 import {
   VISIT_INTERVAL_LABEL as visitIntervalLabel,
   HEALTH_HAPPINESS_LABEL as healthHappinessScoreLabel,

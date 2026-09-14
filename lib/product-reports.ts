@@ -27,6 +27,47 @@ export async function getMonthlyProductSales(period: ReportPeriod) {
     .sort((a, b) => b.amount - a.amount);
 }
 
+export type ProductSaleTransaction = {
+  id: string;
+  productId: string;
+  clientId: string | null;
+  clientName: string | null;
+  rawClientLabel: string | null;
+  staffId: string | null;
+  saleDate: Date;
+  amount: number;
+  quantity: number | null;
+  itemType: string;
+  purchaseType: string;
+  isGift: boolean;
+};
+
+/**
+ * 期間内の物販取引明細(商品別売上ページからの入力ミス修正用)。プレゼント品も含む
+ * 全件を返す(集計からは除外されていても、誤って記録した1件を修正できる必要があるため)。
+ */
+export async function getProductSaleTransactions(period: ReportPeriod): Promise<ProductSaleTransaction[]> {
+  const sales = await prisma.productSale.findMany({
+    where: { saleDate: { gte: period.start, lte: period.end } },
+    orderBy: { saleDate: "desc" },
+    include: { client: { select: { name: true } } },
+  });
+  return sales.map((s) => ({
+    id: s.id,
+    productId: s.productId,
+    clientId: s.clientId,
+    clientName: s.client?.name ?? null,
+    rawClientLabel: s.rawClientLabel,
+    staffId: s.staffId,
+    saleDate: s.saleDate,
+    amount: s.amount,
+    quantity: s.quantity,
+    itemType: s.itemType,
+    purchaseType: s.purchaseType,
+    isGift: s.isGift,
+  }));
+}
+
 /** 期間内のプレゼント品(無料配布)件数を商品別に集計。 */
 export async function getGiftSummary(period: ReportPeriod) {
   const rows = await prisma.productSale.groupBy({
