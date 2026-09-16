@@ -188,28 +188,44 @@ export async function getStaffChurnRate(period: ReportPeriod) {
     .sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0));
 }
 
-/** 全体のn回以上リピーター率(期間終了時点で在籍する全顧客のうち、n回以上来店した割合) */
+/** 期間内に1回以上来院した顧客IDの集合(月次集計の母数を「その月に来た人」に揃えるための共通ヘルパー)。 */
+async function getActiveClientIdsInPeriod(period: ReportPeriod): Promise<Set<string>> {
+  const rows = await prisma.visit.findMany({
+    where: { visitDate: { gte: period.start, lte: period.end } },
+    select: { clientId: true },
+    distinct: ["clientId"],
+  });
+  return new Set(rows.map((r) => r.clientId));
+}
+
+/**
+ * 全体のn回以上リピーター率。母数を「その月(期間)に来院した顧客」に限定し、そのうち
+ * 通算n回以上来店している(=リピーターである)割合を返す。初回→2回目移行率・紹介率と
+ * 同じく「その月の数字」になるよう、期間終了時点の在籍者全員ではなく期間内の来院者を母数にする。
+ */
 export async function getRepeaterRateAtLeast(period: ReportPeriod, minVisits: number) {
   const asOf = asOfNow(period);
-  const [totalClients, stats] = await Promise.all([
-    prisma.client.count({ where: { firstVisitDate: { lte: asOf } } }),
-    getVisitStatsAsOf(asOf),
-  ]);
+  const [activeClientIds, stats] = await Promise.all([getActiveClientIdsInPeriod(period), getVisitStatsAsOf(asOf)]);
+
   let repeaterClients = 0;
-  for (const s of stats.values()) if (s.visitCount >= minVisits) repeaterClients++;
+  for (const clientId of activeClientIds) {
+    const s = stats.get(clientId);
+    if (s && s.visitCount >= minVisits) repeaterClients++;
+  }
   return {
-    totalClients,
+    totalClients: activeClientIds.size,
     repeaterClients,
-    rate: totalClients > 0 ? repeaterClients / totalClients : null,
+    rate: activeClientIds.size > 0 ? repeaterClients / activeClientIds.size : null,
   };
 }
 
-/** スタッフ別n回以上リピーター率(担当顧客のうち、n回以上来店した割合) */
+/** スタッフ別n回以上リピーター率(その月に来院した担当顧客のうち、n回以上来店した割合)。母数の定義は getRepeaterRateAtLeast と同じ。 */
 export async function getStaffRepeaterRateAtLeast(period: ReportPeriod, minVisits: number) {
   const asOf = asOfNow(period);
-  const [clients, stats, staff] = await Promise.all([
+  const [activeClientIds, clients, stats, staff] = await Promise.all([
+    getActiveClientIdsInPeriod(period),
     prisma.client.findMany({
-      where: { firstVisitDate: { lte: asOf }, primaryStaffId: { not: null } },
+      where: { primaryStaffId: { not: null } },
       select: { id: true, primaryStaffId: true },
     }),
     getVisitStatsAsOf(asOf),
@@ -219,6 +235,7 @@ export async function getStaffRepeaterRateAtLeast(period: ReportPeriod, minVisit
 
   const byStaff = new Map<string, { total: number; repeaters: number }>();
   for (const c of clients) {
+    if (!activeClientIds.has(c.id)) continue;
     const s = stats.get(c.id);
     const key = c.primaryStaffId!;
     const cur = byStaff.get(key) ?? { total: 0, repeaters: 0 };

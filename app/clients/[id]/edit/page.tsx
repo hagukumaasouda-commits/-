@@ -2,17 +2,30 @@ import { prisma } from "@/lib/prisma";
 import { updateClient } from "@/app/actions/clients";
 import { notFound } from "next/navigation";
 import { RANK_OPTIONS } from "@/lib/tags";
+import { DeleteClientButton } from "./delete-client-button";
+import { MergeClientForm } from "./merge-client-form";
 
 export default async function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [client, channels, staff, clients] = await Promise.all([
-    prisma.client.findUnique({ where: { id } }),
+  const [client, channels, staff, clients, visitCount, productSaleCount] = await Promise.all([
+    prisma.client.findUnique({ where: { id }, include: { prepaidCard: true } }),
     prisma.acquisitionChannel.findMany({ orderBy: { name: "asc" } }),
     prisma.staff.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.client.findMany({ where: { id: { not: id } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.visit.count({ where: { clientId: id } }),
+    prisma.productSale.count({ where: { clientId: id } }),
   ]);
   if (!client) notFound();
+
+  const prepaidBalance = client.prepaidCard
+    ? (
+        await prisma.prepaidTransaction.aggregate({
+          where: { cardId: client.prepaidCard.id },
+          _sum: { amount: true },
+        })
+      )._sum.amount ?? 0
+    : null;
 
   const action = updateClient.bind(null, client.id);
   const referralSourceClientName = client.referralSourceClientId
@@ -23,6 +36,33 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     <div className="max-w-xl">
       <h1 className="text-xl font-semibold text-stone-900 mb-6">顧客情報を編集</h1>
       <form action={action} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1 text-sm">
+          <span className="text-stone-600">
+            登録区分<span className="text-rose-600"> *</span>
+          </span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-stone-200 bg-stone-50 p-3">
+            <input
+              type="radio"
+              id="regTypeNew"
+              name="registrationType"
+              value="NEW"
+              required
+              defaultChecked={client.registrationType === "NEW"}
+              className="accent-emerald-800"
+            />
+            <label htmlFor="regTypeNew">新規</label>
+            <input
+              type="radio"
+              id="regTypeExisting"
+              name="registrationType"
+              value="EXISTING"
+              required
+              defaultChecked={client.registrationType === "EXISTING"}
+              className="accent-emerald-800"
+            />
+            <label htmlFor="regTypeExisting">既存(データ移行)</label>
+          </div>
+        </div>
         <Field label="氏名" required>
           <input name="name" required defaultValue={client.name} className="input" />
         </Field>
@@ -193,6 +233,29 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
           保存する
         </button>
       </form>
+
+      <section className="mt-10 rounded-lg border border-stone-200 bg-stone-50 p-5">
+        <h2 className="font-semibold text-stone-800 mb-1">危険な操作</h2>
+        <p className="text-xs text-stone-500 mb-4">
+          顧客情報を誤って二重に作成してしまった場合に使います。既に来院記録・プリカ・物販などの実データが入っている場合は、削除ではなく統合を選んでください。
+        </p>
+
+        <div className="flex flex-col gap-2 mb-4">
+          <span className="text-sm font-medium text-stone-700">重複した顧客情報をこの顧客に統合する</span>
+          <MergeClientForm clientId={client.id} clientName={client.name} mergeableClients={clients} />
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-stone-200 pt-4">
+          <span className="text-sm font-medium text-stone-700">この顧客情報を削除する</span>
+          <DeleteClientButton
+            clientId={client.id}
+            clientName={client.name}
+            visitCount={visitCount}
+            prepaidBalance={prepaidBalance}
+            productSaleCount={productSaleCount}
+          />
+        </div>
+      </section>
     </div>
   );
 }
