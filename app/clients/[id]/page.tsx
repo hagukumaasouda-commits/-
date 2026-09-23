@@ -149,7 +149,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             client.manifestNeed ||
             client.deepNeed ||
             client.wants ||
-            latestVisit?.chartRecord?.healthPracticeNote) && (
+            latestVisit?.chartRecord?.healthPracticeNote ||
+            latestVisit?.chartRecord?.healthPracticeInstruction) && (
             <div className="mb-3 flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50/40 p-3 text-sm">
               <p className="text-xs font-medium text-amber-800">施術前に毎回確認</p>
               {client.medicalHistory && (
@@ -192,6 +193,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 <p>
                   <span className="text-stone-500">健康実践状況(最新): </span>
                   {latestVisit.chartRecord.healthPracticeNote}
+                </p>
+              )}
+              {latestVisit?.chartRecord?.healthPracticeInstruction && (
+                <p>
+                  <span className="text-stone-500">今回伝えた実践内容(最新): </span>
+                  {latestVisit.chartRecord.healthPracticeInstruction}
                 </p>
               )}
             </div>
@@ -661,6 +668,7 @@ type VisitWithChart = {
     nextCheck: string | null;
     nextRequired: string | null;
     healthPracticeNote: string | null;
+    healthPracticeInstruction: string | null;
     lifestyleSupportStatus: unknown;
     healthHappinessScore: keyof typeof healthHappinessScoreLabel | null;
     testimonialObtained: boolean;
@@ -735,7 +743,8 @@ function VisitTimelineItem({ v, clientId }: { v: VisitWithChart; clientId: strin
               {v.chartRecord.evaluation && <p>評価: {v.chartRecord.evaluation}</p>}
               {v.chartRecord.changeFromLast && <p>前回からの変化: {v.chartRecord.changeFromLast}</p>}
               {v.chartRecord.clientVoice && <p>お客様の声: {v.chartRecord.clientVoice}</p>}
-              {v.chartRecord.healthPracticeNote && <p>健康実践状況: {v.chartRecord.healthPracticeNote}</p>}
+              {v.chartRecord.healthPracticeNote && <p>健康実践状況(前回の確認): {v.chartRecord.healthPracticeNote}</p>}
+              {v.chartRecord.healthPracticeInstruction && <p>今回伝えた実践内容: {v.chartRecord.healthPracticeInstruction}</p>}
               {v.chartRecord.lifestyleSupportStatus != null && (
                 <p>
                   生活習慣サポート:{" "}

@@ -8,7 +8,14 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
   const client = await prisma.client.findUnique({ where: { id }, select: { id: true, name: true, rank: true } });
   if (!client) notFound();
 
-  const staff = await prisma.staff.findMany({ where: { active: true }, orderBy: { name: "asc" } });
+  const [staff, lastVisit] = await Promise.all([
+    prisma.staff.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    prisma.visit.findFirst({
+      where: { clientId: client.id },
+      orderBy: { visitNo: "desc" },
+      select: { chartRecord: { select: { healthPracticeInstruction: true } } },
+    }),
+  ]);
   const action = createVisit.bind(null, client.id);
 
   return (
@@ -19,6 +26,7 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
       staff={staff}
       defaults={{ rank: client.rank ?? "" }}
       submitLabel="カルテを保存する"
+      previousHealthPracticeInstruction={lastVisit?.chartRecord?.healthPracticeInstruction}
     />
   );
 }

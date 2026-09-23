@@ -16,7 +16,13 @@ export default async function EditVisitPage({ params }: { params: Promise<{ id: 
   ]);
   if (!client || !visit || visit.clientId !== id) notFound();
 
-  const staff = await prisma.staff.findMany({ where: { active: true }, orderBy: { name: "asc" } });
+  const [staff, previousVisit] = await Promise.all([
+    prisma.staff.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    prisma.visit.findFirst({
+      where: { clientId: id, visitNo: visit.visitNo - 1 },
+      select: { chartRecord: { select: { healthPracticeInstruction: true } } },
+    }),
+  ]);
   const chartRecord = visit.chartRecord;
   const isLatestVisit = latestVisit?.id === visit.id;
 
@@ -37,6 +43,7 @@ export default async function EditVisitPage({ params }: { params: Promise<{ id: 
       ? Object.entries(lifestyleSupportStatus).filter(([, done]) => done).map(([item]) => item)
       : [],
     healthPracticeNote: chartRecord?.healthPracticeNote ?? "",
+    healthPracticeInstruction: chartRecord?.healthPracticeInstruction ?? "",
     evaluation: chartRecord?.evaluation ?? "",
     changeFromLast: chartRecord?.changeFromLast ?? "",
     clientVoice: chartRecord?.clientVoice ?? "",
@@ -61,6 +68,7 @@ export default async function EditVisitPage({ params }: { params: Promise<{ id: 
       defaults={defaults}
       showRank={isLatestVisit}
       submitLabel="修正を保存する"
+      previousHealthPracticeInstruction={previousVisit?.chartRecord?.healthPracticeInstruction}
     />
   );
 }

@@ -22,6 +22,7 @@ export async function createVisit(clientId: string, formData: FormData) {
   const requiredVisitIntervalRaw = String(formData.get("requiredVisitInterval") || "");
   const requiredVisitInterval = requiredVisitIntervalRaw ? (requiredVisitIntervalRaw as VisitInterval) : null;
   const healthPracticeNote = String(formData.get("healthPracticeNote") || "") || null;
+  const healthPracticeInstruction = String(formData.get("healthPracticeInstruction") || "") || null;
   const checkedLifestyleItems = new Set(formData.getAll("lifestyleSupportStatus").map(String));
   const lifestyleSupportStatus = Object.fromEntries(
     LIFESTYLE_SUPPORT_ITEMS.map((item) => [item, checkedLifestyleItems.has(item)])
@@ -76,6 +77,7 @@ export async function createVisit(clientId: string, formData: FormData) {
       requiredVisitInterval,
       lifestyleSupportStatus,
       healthPracticeNote,
+      healthPracticeInstruction,
       healthHappinessScore,
       testimonialObtained,
       testimonialObtainedDate,
@@ -134,6 +136,7 @@ export async function updateVisit(visitId: string, formData: FormData) {
   const requiredVisitIntervalRaw = String(formData.get("requiredVisitInterval") || "");
   const requiredVisitInterval = requiredVisitIntervalRaw ? (requiredVisitIntervalRaw as VisitInterval) : null;
   const healthPracticeNote = String(formData.get("healthPracticeNote") || "") || null;
+  const healthPracticeInstruction = String(formData.get("healthPracticeInstruction") || "") || null;
   const checkedLifestyleItems = new Set(formData.getAll("lifestyleSupportStatus").map(String));
   const lifestyleSupportStatus = Object.fromEntries(
     LIFESTYLE_SUPPORT_ITEMS.map((item) => [item, checkedLifestyleItems.has(item)])
@@ -180,6 +183,7 @@ export async function updateVisit(visitId: string, formData: FormData) {
       requiredVisitInterval,
       lifestyleSupportStatus,
       healthPracticeNote,
+      healthPracticeInstruction,
       healthHappinessScore,
       testimonialObtained,
       testimonialObtainedDate,

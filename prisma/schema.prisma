@@ -213,8 +213,9 @@ model ChartRecord {
 
   requiredVisitInterval VisitInterval? // 必要来院ペース。離脱候補判定に、その顧客の直近の値を使う(未記録なら42日固定にフォールバック)
 
-  lifestyleSupportStatus Json? // 生活習慣サポート実施状況(てる1〜Bトレ等、社内略称キーの済/未マップ。lib/tags.ts の LIFESTYLE_SUPPORT_ITEMS)
-  healthPracticeNote     String? // 健康実践状況(自由記述。来院ごとに記録し、タイムラインで時系列に蓄積する)
+  lifestyleSupportStatus    Json? // 生活習慣サポート実施状況(てる1〜Bトレ等、社内略称キーの済/未マップ。lib/tags.ts の LIFESTYLE_SUPPORT_ITEMS)
+  healthPracticeNote        String? // 健康実践状況(自由記述。前回伝えた実践内容を実践できていたかの確認結果を記録する)
+  healthPracticeInstruction String? // 今回伝えた健康実践情報(次回来院時にリマインド表示し、実践できたか確認できるようにする)
 
   healthHappinessScore HealthHappinessScore? // 回復度(健康度幸福度)。任意項目、最新値を顧客詳細ページに表示
 

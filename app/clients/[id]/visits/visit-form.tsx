@@ -21,6 +21,7 @@ export type VisitFormDefaults = {
   bodyPartTags?: string[];
   lifestyleSupportStatus?: string[];
   healthPracticeNote?: string;
+  healthPracticeInstruction?: string;
   evaluation?: string;
   changeFromLast?: string;
   clientVoice?: string;
@@ -44,6 +45,7 @@ export function VisitForm({
   defaults = {},
   showRank = true,
   submitLabel,
+  previousHealthPracticeInstruction,
 }: {
   heading: string;
   clientName: string;
@@ -52,6 +54,7 @@ export function VisitForm({
   defaults?: VisitFormDefaults;
   showRank?: boolean;
   submitLabel: string;
+  previousHealthPracticeInstruction?: string | null;
 }) {
   return (
     <div className="max-w-2xl">
@@ -126,13 +129,31 @@ export function VisitForm({
           <TagCheckboxes name="lifestyleSupportStatus" options={LIFESTYLE_SUPPORT_ITEMS} defaultValues={defaults.lifestyleSupportStatus} />
         </Field>
 
-        <Field label="健康実践状況">
+        {previousHealthPracticeInstruction && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-medium">前回伝えた健康実践情報</p>
+            <p className="mt-1 whitespace-pre-wrap">{previousHealthPracticeInstruction}</p>
+            <p className="mt-1 text-xs text-amber-700">↓ 実践できていたか下欄で確認してください</p>
+          </div>
+        )}
+
+        <Field label="健康実践状況(前回の実践内容の確認)">
           <textarea
             name="healthPracticeNote"
             rows={2}
             className="input"
-            placeholder="ストレッチ・トレーニングなど、今回の実践内容を自由に記入"
+            placeholder="前回伝えた内容を実践できていたか、様子を自由に記入"
             defaultValue={defaults.healthPracticeNote}
+          />
+        </Field>
+
+        <Field label="今回伝えた健康実践情報">
+          <textarea
+            name="healthPracticeInstruction"
+            rows={2}
+            className="input"
+            placeholder="ストレッチ・トレーニングなど、今回新たに伝えた実践内容を記入(次回来院時にリマインド表示されます)"
+            defaultValue={defaults.healthPracticeInstruction}
           />
         </Field>
 
