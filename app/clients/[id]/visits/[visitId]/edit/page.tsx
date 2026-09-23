@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { updateVisit } from "@/app/actions/visits";
 import { notFound } from "next/navigation";
 import { VisitForm, type VisitFormDefaults } from "../../visit-form";
+import type { StandingExamDefaults, SittingExamDefaults, SupineExamDefaults } from "../../basic-exam-section";
 
 export default async function EditVisitPage({ params }: { params: Promise<{ id: string; visitId: string }> }) {
   const { id, visitId } = await params;
@@ -28,6 +29,46 @@ export default async function EditVisitPage({ params }: { params: Promise<{ id: 
 
   const treatmentModalities = chartRecord?.treatmentModalities as Record<string, boolean> | null;
   const lifestyleSupportStatus = chartRecord?.lifestyleSupportStatus as Record<string, boolean> | null;
+  const standingExamJson = (chartRecord?.standingExam ?? null) as Record<string, unknown> | null;
+  const sittingExamJson = (chartRecord?.sittingExam ?? null) as Record<string, unknown> | null;
+  const supineExamJson = (chartRecord?.supineExam ?? null) as Record<string, unknown> | null;
+
+  const standingExam: StandingExamDefaults = {
+    distortion: (standingExamJson?.distortion as string[]) ?? [],
+    transverseShift: (standingExamJson?.transverseShift as StandingExamDefaults["transverseShift"]) ?? "",
+    tripodArch: (standingExamJson?.tripodArch as StandingExamDefaults["tripodArch"]) ?? "",
+    weightAxis: (standingExamJson?.weightAxis as StandingExamDefaults["weightAxis"]) ?? "",
+    muscleTensionAreas: (standingExamJson?.muscleTensionAreas as string[]) ?? [],
+    muscleTensionNote: (standingExamJson?.muscleTensionNote as string) ?? "",
+    flexionExtension: (standingExamJson?.flexionExtension as StandingExamDefaults["flexionExtension"]) ?? "",
+    flexionExtensionNote: (standingExamJson?.flexionExtensionNote as string) ?? "",
+    squatSingleLegNote: (standingExamJson?.squatSingleLegNote as string) ?? "",
+    sendanSuspected: (standingExamJson?.sendanSuspected as boolean) ?? false,
+    memo: (standingExamJson?.memo as string) ?? "",
+  };
+
+  const sittingExam: SittingExamDefaults = {
+    armWeight: (sittingExamJson?.armWeight as SittingExamDefaults["armWeight"]) ?? "",
+    shoulderRom: (sittingExamJson?.shoulderRom as SittingExamDefaults["shoulderRom"]) ?? "",
+    spineDistortionTags: (sittingExamJson?.spineDistortionTags as string[]) ?? [],
+    pelvisStiffness: (sittingExamJson?.pelvisStiffness as SittingExamDefaults["pelvisStiffness"]) ?? "",
+    distortion: (sittingExamJson?.distortion as string[]) ?? [],
+    transverseShift: (sittingExamJson?.transverseShift as SittingExamDefaults["transverseShift"]) ?? "",
+    memo: (sittingExamJson?.memo as string) ?? "",
+  };
+
+  const supineExam: SupineExamDefaults = {
+    legWeight: (supineExamJson?.legWeight as SupineExamDefaults["legWeight"]) ?? "",
+    poplitealStagnation: (supineExamJson?.poplitealStagnation as SupineExamDefaults["poplitealStagnation"]) ?? "",
+    hipPelvisStiffness: (supineExamJson?.hipPelvisStiffness as SupineExamDefaults["hipPelvisStiffness"]) ?? "",
+    abdomenStiffness: (supineExamJson?.abdomenStiffness as SupineExamDefaults["abdomenStiffness"]) ?? "",
+    ribStiffness: (supineExamJson?.ribStiffness as SupineExamDefaults["ribStiffness"]) ?? "",
+    ribStiffnessNote: (supineExamJson?.ribStiffnessNote as string) ?? "",
+    neckStiffness: (supineExamJson?.neckStiffness as SupineExamDefaults["neckStiffness"]) ?? "",
+    headWeightTwist: (supineExamJson?.headWeightTwist as SupineExamDefaults["headWeightTwist"]) ?? "",
+    headWeightTwistNote: (supineExamJson?.headWeightTwistNote as string) ?? "",
+    memo: (supineExamJson?.memo as string) ?? "",
+  };
 
   const defaults: VisitFormDefaults = {
     visitDate: visit.visitDate.toISOString().slice(0, 10),
@@ -44,6 +85,9 @@ export default async function EditVisitPage({ params }: { params: Promise<{ id: 
       : [],
     healthPracticeNote: chartRecord?.healthPracticeNote ?? "",
     healthPracticeInstruction: chartRecord?.healthPracticeInstruction ?? "",
+    standingExam,
+    sittingExam,
+    supineExam,
     evaluation: chartRecord?.evaluation ?? "",
     changeFromLast: chartRecord?.changeFromLast ?? "",
     clientVoice: chartRecord?.clientVoice ?? "",

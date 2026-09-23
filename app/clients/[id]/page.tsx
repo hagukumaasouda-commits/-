@@ -677,10 +677,113 @@ type VisitWithChart = {
     referralCount: number | null;
     menuPlan: keyof typeof menuPlanLabel | null;
     treatmentModalities: unknown;
+    standingExam: unknown;
+    sittingExam: unknown;
+    supineExam: unknown;
   } | null;
 };
 
+// 基本検査記録の折りたたみ表示用フォーマッタ。docs/basic-exam-cheatsheet-spec-v2.md
+// 「特記なし/無/正常/使えている」の基準値は表示せず、所見がある項目・自由記述のみを表示する。
+function examPresent(v: unknown): string | null {
+  return v === "PRESENT" ? "有" : null;
+}
+function examNotUsed(v: unknown): string | null {
+  return v === "NOT_USED" ? "使えていない" : null;
+}
+function examDeviated(v: unknown): string | null {
+  return v === "DEVIATED" ? "逸脱" : null;
+}
+function examTriState(v: unknown): string | null {
+  if (v === "MILD") return "軽度";
+  if (v === "MARKED") return "著明";
+  return null;
+}
+function examTags(v: unknown): string | null {
+  const arr = Array.isArray(v) ? (v as unknown[]).filter((x): x is string => typeof x === "string") : [];
+  return arr.length > 0 ? arr.join("・") : null;
+}
+function examText(v: unknown): string | null {
+  return typeof v === "string" && v ? v : null;
+}
+function withNote(label: string, note: string | null): string {
+  return note ? `${label}(${note})` : label;
+}
+
+function standingExamLines(exam: unknown): string[] {
+  const e = (exam ?? null) as Record<string, unknown> | null;
+  if (!e) return [];
+  const lines: string[] = [];
+  const distortion = examTags(e.distortion);
+  if (distortion) lines.push(`左右のゆがみ: ${distortion}`);
+  const transverseShift = examPresent(e.transverseShift);
+  if (transverseShift) lines.push(`トランズ: ${transverseShift}`);
+  const tripodArch = examNotUsed(e.tripodArch);
+  if (tripodArch) lines.push(`三点アーチ: ${tripodArch}`);
+  const weightAxis = examDeviated(e.weightAxis);
+  if (weightAxis) lines.push(`重心軸: ${weightAxis}`);
+  const muscleTensionAreas = examTags(e.muscleTensionAreas);
+  if (muscleTensionAreas) lines.push(`筋緊張部位: ${withNote(muscleTensionAreas, examText(e.muscleTensionNote))}`);
+  const flexionExtension = examTriState(e.flexionExtension);
+  if (flexionExtension) lines.push(`前屈・後屈: ${withNote(flexionExtension, examText(e.flexionExtensionNote))}`);
+  const squatNote = examText(e.squatSingleLegNote);
+  if (squatNote) lines.push(`しゃがみ動作・片足立ち: ${squatNote}`);
+  if (e.sendanSuspected === true) lines.push("センダンの可能性あり(乳様突起・肩甲骨下角・腸骨稜の同側下がり)");
+  const memo = examText(e.memo);
+  if (memo) lines.push(`メモ: ${memo}`);
+  return lines;
+}
+
+function sittingExamLines(exam: unknown): string[] {
+  const e = (exam ?? null) as Record<string, unknown> | null;
+  if (!e) return [];
+  const lines: string[] = [];
+  const armWeight = examTriState(e.armWeight);
+  if (armWeight) lines.push(`腕の重さ: ${armWeight}`);
+  const shoulderRom = examTriState(e.shoulderRom);
+  if (shoulderRom) lines.push(`肩の可動域: ${shoulderRom}`);
+  const spineDistortionTags = examTags(e.spineDistortionTags);
+  if (spineDistortionTags) lines.push(`脊椎のゆがみ・硬さ: ${spineDistortionTags}`);
+  const pelvisStiffness = examTriState(e.pelvisStiffness);
+  if (pelvisStiffness) lines.push(`骨盤の硬さと歪み: ${pelvisStiffness}`);
+  const distortion = examTags(e.distortion);
+  if (distortion) lines.push(`左右のゆがみ: ${distortion}`);
+  const transverseShift = examPresent(e.transverseShift);
+  if (transverseShift) lines.push(`トランズ: ${transverseShift}`);
+  const memo = examText(e.memo);
+  if (memo) lines.push(`メモ: ${memo}`);
+  return lines;
+}
+
+function supineExamLines(exam: unknown): string[] {
+  const e = (exam ?? null) as Record<string, unknown> | null;
+  if (!e) return [];
+  const lines: string[] = [];
+  const legWeight = examTriState(e.legWeight);
+  if (legWeight) lines.push(`下肢の重さ: ${legWeight}`);
+  const poplitealStagnation = examPresent(e.poplitealStagnation);
+  if (poplitealStagnation) lines.push(`膝窩の滞り: ${poplitealStagnation}`);
+  const hipPelvisStiffness = examTriState(e.hipPelvisStiffness);
+  if (hipPelvisStiffness) lines.push(`股関節屈曲・骨盤の硬さ: ${hipPelvisStiffness}`);
+  const abdomenStiffness = examTriState(e.abdomenStiffness);
+  if (abdomenStiffness) lines.push(`お腹の硬さ: ${abdomenStiffness}`);
+  const ribStiffness = examTriState(e.ribStiffness);
+  if (ribStiffness) lines.push(`肋骨の硬さと開き: ${withNote(ribStiffness, examText(e.ribStiffnessNote))}`);
+  const neckStiffness = examTriState(e.neckStiffness);
+  if (neckStiffness) lines.push(`頸部の硬さ: ${neckStiffness}`);
+  const headWeightTwist = examTriState(e.headWeightTwist);
+  if (headWeightTwist) lines.push(`頭の重さ・捻じれ: ${withNote(headWeightTwist, examText(e.headWeightTwistNote))}`);
+  const memo = examText(e.memo);
+  if (memo) lines.push(`メモ: ${memo}`);
+  return lines;
+}
+
 function VisitTimelineItem({ v, clientId }: { v: VisitWithChart; clientId: string }) {
+  const standingLines = standingExamLines(v.chartRecord?.standingExam);
+  const sittingLines = sittingExamLines(v.chartRecord?.sittingExam);
+  const supineLines = supineExamLines(v.chartRecord?.supineExam);
+  const hasExamFindings = standingLines.length > 0 || sittingLines.length > 0 || supineLines.length > 0;
+
   return (
     <li className="py-3">
       <details>
@@ -763,6 +866,37 @@ function VisitTimelineItem({ v, clientId }: { v: VisitWithChart; clientId: strin
               )}
               {v.chartRecord.referralGiven && <p>紹介あり({v.chartRecord.referralCount ?? 1}人)</p>}
             </div>
+            {hasExamFindings && (
+              <details className="rounded-md border border-stone-200 bg-stone-50 p-2 text-xs text-stone-600">
+                <summary className="cursor-pointer">基本検査記録を見る</summary>
+                <div className="mt-2 flex flex-col gap-2">
+                  {standingLines.length > 0 && (
+                    <div>
+                      <p className="font-medium text-stone-700">立位</p>
+                      {standingLines.map((line, i) => (
+                        <p key={i}>{line}</p>
+                      ))}
+                    </div>
+                  )}
+                  {sittingLines.length > 0 && (
+                    <div>
+                      <p className="font-medium text-stone-700">座位</p>
+                      {sittingLines.map((line, i) => (
+                        <p key={i}>{line}</p>
+                      ))}
+                    </div>
+                  )}
+                  {supineLines.length > 0 && (
+                    <div>
+                      <p className="font-medium text-stone-700">背臥位</p>
+                      {supineLines.map((line, i) => (
+                        <p key={i}>{line}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
           </div>
         )}
       </details>

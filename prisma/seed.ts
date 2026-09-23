@@ -113,7 +113,6 @@ async function main() {
             bodyPartTagPool[i % bodyPartTagPool.length],
             bodyPartTagPool[(i + 1) % bodyPartTagPool.length],
           ],
-          exam: { neck: "2", chest: "2", waist: "2" },
           evaluation: `第${i}回。前回からの反応は良好。`,
           changeFromLast: i === 1 ? null : "可動域がやや改善",
           nextCheck: "睡眠時間の変化を確認",

@@ -10,6 +10,8 @@ import {
   RANK_OPTIONS,
 } from "@/lib/tags";
 import { VisitMenuBuilder } from "./visit-menu-builder";
+import { BasicExamSection, type StandingExamDefaults, type SittingExamDefaults, type SupineExamDefaults } from "./basic-exam-section";
+import { MitateCheatsheet } from "./mitate-cheatsheet";
 
 export type VisitFormDefaults = {
   visitDate?: string;
@@ -22,6 +24,9 @@ export type VisitFormDefaults = {
   lifestyleSupportStatus?: string[];
   healthPracticeNote?: string;
   healthPracticeInstruction?: string;
+  standingExam?: StandingExamDefaults;
+  sittingExam?: SittingExamDefaults;
+  supineExam?: SupineExamDefaults;
   evaluation?: string;
   changeFromLast?: string;
   clientVoice?: string;
@@ -125,6 +130,8 @@ export function VisitForm({
           <TagCheckboxes name="bodyPartTags" options={BODY_PART_TAGS} defaultValues={defaults.bodyPartTags} />
         </Field>
 
+        <BasicExamSection standing={defaults.standingExam} sitting={defaults.sittingExam} supine={defaults.supineExam} />
+
         <Field label="生活習慣サポート実施状況">
           <TagCheckboxes name="lifestyleSupportStatus" options={LIFESTYLE_SUPPORT_ITEMS} defaultValues={defaults.lifestyleSupportStatus} />
         </Field>
@@ -156,6 +163,8 @@ export function VisitForm({
             defaultValue={defaults.healthPracticeInstruction}
           />
         </Field>
+
+        <MitateCheatsheet />
 
         <Field label="評価(何が起きているか)">
           <textarea name="evaluation" rows={3} className="input" defaultValue={defaults.evaluation} />

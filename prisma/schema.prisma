@@ -200,7 +200,10 @@ model ChartRecord {
   chiefComplaintTags String[] // 肩こり / 腰痛 / 自律神経症状 など(来院理由分布に使用)
   bodyPartTags       String[] // 頭蓋 / 内臓 / 上肢 / 下肢 / 脊椎 / 体幹(施術部位分布に使用)
 
-  exam            Json? // 可動域・脊椎状態・重心軸などの検査値
+  standingExam Json? // 基本検査記録(立位)。ゆがみ・トランズ・三点アーチ・重心軸・筋緊張部位・前後屈所見・センダン所見など
+  sittingExam  Json? // 基本検査記録(座位)。腕の重さ・肩可動域・脊椎のゆがみ硬さ・骨盤の硬さゆがみ・トランズなど
+  supineExam   Json? // 基本検査記録(背臥位)。下肢の重さ・膝窩の滞り・股関節骨盤の硬さ・お腹肋骨頸部の硬さ・頭の重さ捻じれなど
+
   treatmentDetail Json? // 部位×体位×コメントの施術詳細
 
   evaluation      String? // 何が起きているか

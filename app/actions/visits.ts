@@ -6,6 +6,55 @@ import { prisma } from "@/lib/prisma";
 import { VisitInterval, HealthHappinessScore, ClientRank, MenuPlan } from "@/app/generated/prisma/client";
 import { LIFESTYLE_SUPPORT_ITEMS, TREATMENT_MODALITY_ITEMS } from "@/lib/tags";
 
+/**
+ * 来院記録フォームの基本検査記録欄(立位・座位・背臥位)をパースする。
+ * docs/basic-exam-cheatsheet-spec-v2.md
+ */
+function parseBasicExam(formData: FormData) {
+  const radio = (name: string) => String(formData.get(name) || "") || null;
+  const text = (name: string) => String(formData.get(name) || "") || null;
+  const tags = (name: string) => formData.getAll(name).map(String);
+
+  const standingExam = {
+    distortion: tags("standingDistortion"),
+    transverseShift: radio("standingTransverseShift"),
+    tripodArch: radio("standingTripodArch"),
+    weightAxis: radio("standingWeightAxis"),
+    muscleTensionAreas: tags("standingMuscleTensionAreas"),
+    muscleTensionNote: text("standingMuscleTensionNote"),
+    flexionExtension: radio("standingFlexionExtension"),
+    flexionExtensionNote: text("standingFlexionExtensionNote"),
+    squatSingleLegNote: text("standingSquatSingleLegNote"),
+    sendanSuspected: formData.get("standingSendanSuspected") === "true",
+    memo: text("standingMemo"),
+  };
+
+  const sittingExam = {
+    armWeight: radio("sittingArmWeight"),
+    shoulderRom: radio("sittingShoulderRom"),
+    spineDistortionTags: tags("sittingSpineDistortionTags"),
+    pelvisStiffness: radio("sittingPelvisStiffness"),
+    distortion: tags("sittingDistortion"),
+    transverseShift: radio("sittingTransverseShift"),
+    memo: text("sittingMemo"),
+  };
+
+  const supineExam = {
+    legWeight: radio("supineLegWeight"),
+    poplitealStagnation: radio("supinePoplitealStagnation"),
+    hipPelvisStiffness: radio("supineHipPelvisStiffness"),
+    abdomenStiffness: radio("supineAbdomenStiffness"),
+    ribStiffness: radio("supineRibStiffness"),
+    ribStiffnessNote: text("supineRibStiffnessNote"),
+    neckStiffness: radio("supineNeckStiffness"),
+    headWeightTwist: radio("supineHeadWeightTwist"),
+    headWeightTwistNote: text("supineHeadWeightTwistNote"),
+    memo: text("supineMemo"),
+  };
+
+  return { standingExam, sittingExam, supineExam };
+}
+
 export async function createVisit(clientId: string, formData: FormData) {
   const staffId = String(formData.get("staffId") || "");
   const visitDateRaw = String(formData.get("visitDate") || "");
@@ -50,6 +99,7 @@ export async function createVisit(clientId: string, formData: FormData) {
   );
 
   const isManualReturnFlag = formData.get("isManualReturnFlag") === "true";
+  const { standingExam, sittingExam, supineExam } = parseBasicExam(formData);
 
   const existingCount = await prisma.visit.count({ where: { clientId } });
   const visitNo = existingCount + 1;
@@ -78,6 +128,9 @@ export async function createVisit(clientId: string, formData: FormData) {
       lifestyleSupportStatus,
       healthPracticeNote,
       healthPracticeInstruction,
+      standingExam,
+      sittingExam,
+      supineExam,
       healthHappinessScore,
       testimonialObtained,
       testimonialObtainedDate,
@@ -164,6 +217,7 @@ export async function updateVisit(visitId: string, formData: FormData) {
   );
 
   const isManualReturnFlag = formData.get("isManualReturnFlag") === "true";
+  const { standingExam, sittingExam, supineExam } = parseBasicExam(formData);
 
   await prisma.visit.update({
     where: { id: visitId },
@@ -184,6 +238,9 @@ export async function updateVisit(visitId: string, formData: FormData) {
       lifestyleSupportStatus,
       healthPracticeNote,
       healthPracticeInstruction,
+      standingExam,
+      sittingExam,
+      supineExam,
       healthHappinessScore,
       testimonialObtained,
       testimonialObtainedDate,

@@ -115,6 +115,16 @@ export const RANK_OPTIONS: { value: ClientRank; label: string }[] = [
   { value: "C3", label: "C3" },
 ];
 
+// 基本検査記録(立位・座位・背臥位)。docs/basic-exam-cheatsheet-spec-v2.md
+export const DISTORTION_TAGS = ["捻じれ", "膨隆", "中心軸逸脱"] as const;
+export const SPINE_DISTORTION_TAGS = ["スプリング", "頸部屈曲伸展", "左右回旋", "左右側屈"] as const;
+
+export const TRI_STATE_OPTIONS: { value: "NONE" | "MILD" | "MARKED"; label: string }[] = [
+  { value: "NONE", label: "特記なし" },
+  { value: "MILD", label: "軽度" },
+  { value: "MARKED", label: "著明" },
+];
+
 // 生活習慣サポート実施状況(初回カルテVer1.0の項目をそのまま踏襲。社内略称のまま表示する)。
 export const LIFESTYLE_SUPPORT_ITEMS = [
   "てる1",
