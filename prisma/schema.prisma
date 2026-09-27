@@ -204,7 +204,7 @@ model ChartRecord {
   sittingExam  Json? // 基本検査記録(座位)。腕の重さ・肩可動域・脊椎のゆがみ硬さ・骨盤の硬さゆがみ・トランズなど
   supineExam   Json? // 基本検査記録(背臥位)。下肢の重さ・膝窩の滞り・股関節骨盤の硬さ・お腹肋骨頸部の硬さ・頭の重さ捻じれなど
 
-  treatmentDetail Json? // 部位×体位×コメントの施術詳細
+  treatmentMemo String? // 施術メモ(自由記述。今回の施術で実際に行ったことを記録する)
 
   evaluation      String? // 何が起きているか
   changeFromLast  String? // 前回からの変化

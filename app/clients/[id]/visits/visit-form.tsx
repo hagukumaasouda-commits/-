@@ -27,6 +27,7 @@ export type VisitFormDefaults = {
   standingExam?: StandingExamDefaults;
   sittingExam?: SittingExamDefaults;
   supineExam?: SupineExamDefaults;
+  treatmentMemo?: string;
   evaluation?: string;
   changeFromLast?: string;
   clientVoice?: string;
@@ -131,6 +132,16 @@ export function VisitForm({
         </Field>
 
         <BasicExamSection standing={defaults.standingExam} sitting={defaults.sittingExam} supine={defaults.supineExam} />
+
+        <Field label="施術メモ">
+          <textarea
+            name="treatmentMemo"
+            rows={3}
+            className="input"
+            placeholder="今回の施術で実際に行ったことを自由に記入"
+            defaultValue={defaults.treatmentMemo}
+          />
+        </Field>
 
         <Field label="生活習慣サポート実施状況">
           <TagCheckboxes name="lifestyleSupportStatus" options={LIFESTYLE_SUPPORT_ITEMS} defaultValues={defaults.lifestyleSupportStatus} />

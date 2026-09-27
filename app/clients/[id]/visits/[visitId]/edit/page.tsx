@@ -88,6 +88,7 @@ export default async function EditVisitPage({ params }: { params: Promise<{ id: 
     standingExam,
     sittingExam,
     supineExam,
+    treatmentMemo: chartRecord?.treatmentMemo ?? "",
     evaluation: chartRecord?.evaluation ?? "",
     changeFromLast: chartRecord?.changeFromLast ?? "",
     clientVoice: chartRecord?.clientVoice ?? "",

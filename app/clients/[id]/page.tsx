@@ -663,6 +663,7 @@ type VisitWithChart = {
     chiefComplaintTags: string[];
     bodyPartTags: string[];
     evaluation: string | null;
+    treatmentMemo: string | null;
     changeFromLast: string | null;
     clientVoice: string | null;
     nextCheck: string | null;
@@ -843,6 +844,7 @@ function VisitTimelineItem({ v, clientId }: { v: VisitWithChart; clientId: strin
               )}
               {v.chartRecord.chiefComplaintTags.length > 0 && <p>主訴: {v.chartRecord.chiefComplaintTags.join("、")}</p>}
               {v.chartRecord.bodyPartTags.length > 0 && <p>部位: {v.chartRecord.bodyPartTags.join("、")}</p>}
+              {v.chartRecord.treatmentMemo && <p>施術メモ: {v.chartRecord.treatmentMemo}</p>}
               {v.chartRecord.evaluation && <p>評価: {v.chartRecord.evaluation}</p>}
               {v.chartRecord.changeFromLast && <p>前回からの変化: {v.chartRecord.changeFromLast}</p>}
               {v.chartRecord.clientVoice && <p>お客様の声: {v.chartRecord.clientVoice}</p>}
