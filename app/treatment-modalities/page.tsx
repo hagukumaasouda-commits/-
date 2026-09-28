@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { granularityToPeriod } from "@/lib/reports";
-import { getMonthlyTreatmentModalityCounts } from "@/lib/treatment-modality-reports";
+import { getMonthlyTreatmentModalityCounts, getStaffTreatmentModalityCounts } from "@/lib/treatment-modality-reports";
+import { TREATMENT_MODALITY_ITEMS } from "@/lib/tags";
 
 function fmtDate(d: Date) {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
@@ -23,7 +24,10 @@ export default async function TreatmentModalitiesPage({
   const reference = sp.ref ? new Date(sp.ref) : new Date();
   const period = granularityToPeriod(granularity, reference);
 
-  const counts = await getMonthlyTreatmentModalityCounts(period);
+  const [counts, staffCounts] = await Promise.all([
+    getMonthlyTreatmentModalityCounts(period),
+    getStaffTreatmentModalityCounts(period),
+  ]);
   const totalCount = counts.reduce((s, c) => s + c.count, 0);
 
   const prevHref = `/treatment-modalities?granularity=${granularity}&ref=${shiftReference(reference, granularity, -1)}`;
@@ -81,6 +85,43 @@ export default async function TreatmentModalitiesPage({
               <tr key={c.item} className="border-b border-stone-100 last:border-0">
                 <td className="py-1.5">{c.item}</td>
                 <td className="py-1.5 text-right tabular-nums">{c.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="rounded-lg border border-stone-200 bg-white p-5 overflow-x-auto">
+        <h2 className="font-semibold mb-3">スタッフ別実施件数</h2>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-stone-500 border-b border-stone-200">
+              <th className="py-1.5 font-normal">スタッフ</th>
+              {TREATMENT_MODALITY_ITEMS.map((item) => (
+                <th key={item} className="py-1.5 font-normal text-right whitespace-nowrap">
+                  {item}
+                </th>
+              ))}
+              <th className="py-1.5 font-normal text-right">合計</th>
+            </tr>
+          </thead>
+          <tbody>
+            {staffCounts.length === 0 && (
+              <tr>
+                <td colSpan={TREATMENT_MODALITY_ITEMS.length + 2} className="py-2 text-stone-400">
+                  この期間の物療実施記録はありません
+                </td>
+              </tr>
+            )}
+            {staffCounts.map((s) => (
+              <tr key={s.staffId} className="border-b border-stone-100 last:border-0">
+                <td className="py-1.5 whitespace-nowrap">{s.staffName}</td>
+                {TREATMENT_MODALITY_ITEMS.map((item) => (
+                  <td key={item} className="py-1.5 text-right tabular-nums">
+                    {s.counts[item] ?? 0}
+                  </td>
+                ))}
+                <td className="py-1.5 text-right tabular-nums font-medium">{s.total}</td>
               </tr>
             ))}
           </tbody>

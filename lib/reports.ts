@@ -119,25 +119,98 @@ export async function getChurnedClientIds(asOf: Date = new Date()): Promise<stri
   return result;
 }
 
+export type NewClientRow = { clientId: string; clientName: string; firstVisitDate: Date; staffId: string | null; staffName: string };
+
+/** 1. 新規来院数の対象顧客一覧(期間内に初回来店した、真の新患のみ)。docs/dashboard-staff-breakdown-spec-v2.md ③ */
+export async function getNewClientsInPeriod(period: ReportPeriod): Promise<NewClientRow[]> {
+  const [clients, staff] = await Promise.all([
+    prisma.client.findMany({
+      where: { firstVisitDate: { gte: period.start, lte: period.end }, registrationType: RegistrationType.NEW },
+      select: { id: true, name: true, firstVisitDate: true, primaryStaffId: true },
+      orderBy: { firstVisitDate: "asc" },
+    }),
+    prisma.staff.findMany({ select: { id: true, name: true } }),
+  ]);
+  const nameOf = new Map(staff.map((s) => [s.id, s.name]));
+  return clients.map((c) => ({
+    clientId: c.id,
+    clientName: c.name,
+    firstVisitDate: c.firstVisitDate!,
+    staffId: c.primaryStaffId,
+    staffName: c.primaryStaffId ? (nameOf.get(c.primaryStaffId) ?? "(不明)") : "未設定",
+  }));
+}
+
 /** 1. 新規来院数: 期間内に初回来店した人数(真の新患のみ。既存患者のデータ移行は含めない) */
 export async function countNewVisits(period: ReportPeriod) {
-  return prisma.client.count({
-    where: { firstVisitDate: { gte: period.start, lte: period.end }, registrationType: RegistrationType.NEW },
-  });
+  return (await getNewClientsInPeriod(period)).length;
+}
+
+export type ChurnedClientRow = { clientId: string; clientName: string; lastVisitDate: Date; staffId: string | null; staffName: string };
+
+/** 2. 離脱扱いの顧客一覧(期間終了時点)。docs/dashboard-staff-breakdown-spec-v2.md ③ */
+export async function getChurnedClientRows(period: ReportPeriod): Promise<ChurnedClientRow[]> {
+  const asOf = asOfNow(period);
+  const ids = await getChurnedClientIds(asOf);
+  if (ids.length === 0) return [];
+  const [clients, stats, staff] = await Promise.all([
+    prisma.client.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, primaryStaffId: true } }),
+    getVisitStatsAsOf(asOf),
+    prisma.staff.findMany({ select: { id: true, name: true } }),
+  ]);
+  const nameOf = new Map(staff.map((s) => [s.id, s.name]));
+  return clients
+    .map((c) => ({
+      clientId: c.id,
+      clientName: c.name,
+      lastVisitDate: stats.get(c.id)!.lastVisitDate,
+      staffId: c.primaryStaffId,
+      staffName: c.primaryStaffId ? (nameOf.get(c.primaryStaffId) ?? "(不明)") : "未設定",
+    }))
+    .sort((a, b) => a.lastVisitDate.getTime() - b.lastVisitDate.getTime());
 }
 
 /** 2. 離脱数(期間終了時点) */
 export async function countChurned(period: ReportPeriod) {
-  const ids = await getChurnedClientIds(asOfNow(period));
-  return ids.length;
+  return (await getChurnedClientRows(period)).length;
 }
 
-/** 3 / 4. n回以上のリピーター人数(期間終了時点) */
-export async function countRepeatersAtLeast(period: ReportPeriod, minVisits: number) {
-  const stats = await getVisitStatsAsOf(asOfNow(period));
+/**
+ * 3 / 4. n回以上のリピーター人数(現在時点での通算来院回数。docs/dashboard-staff-breakdown-spec-v2.md ④)。
+ * ダッシュボードの期間選択(週次/月次・前後移動)から独立し、常に「今」時点での累計で判定する
+ * (getBirthdayClientsThisMonthと同じ考え方。過去の期間を表示しても数字が変わらない)。
+ */
+export async function countRepeatersAtLeast(minVisits: number) {
+  const stats = await getVisitStatsAsOf(new Date());
   let count = 0;
   for (const s of stats.values()) if (s.visitCount >= minVisits) count++;
   return count;
+}
+
+/** スタッフ別のn回以上リピーター人数(現在時点での通算来院回数、担当顧客のうち)。母数はgetStaffCaseloadと同じ定義。 */
+export async function getStaffRepeatersAtLeast(minVisits: number) {
+  const now = new Date();
+  const [clients, stats, staff] = await Promise.all([
+    prisma.client.findMany({
+      where: { firstVisitDate: { lte: now }, primaryStaffId: { not: null } },
+      select: { id: true, primaryStaffId: true },
+    }),
+    getVisitStatsAsOf(now),
+    prisma.staff.findMany({ select: { id: true, name: true } }),
+  ]);
+  const nameOf = new Map(staff.map((s) => [s.id, s.name]));
+
+  const byStaff = new Map<string, number>();
+  for (const c of clients) {
+    const s = stats.get(c.id);
+    if (s && s.visitCount >= minVisits) {
+      const key = c.primaryStaffId!;
+      byStaff.set(key, (byStaff.get(key) ?? 0) + 1);
+    }
+  }
+  return Array.from(byStaff.entries())
+    .map(([staffId, count]) => ({ staffId, staffName: nameOf.get(staffId) ?? "(不明)", count }))
+    .sort((a, b) => b.count - a.count);
 }
 
 /** 全体の離脱率(期間終了時点で在籍する全顧客のうち、離脱扱いになっている割合) */
@@ -292,12 +365,12 @@ export async function getChannelBreakdown(period: ReportPeriod) {
     .sort((a, b) => b.clientCount - a.clientCount);
 }
 
-type Cohort = { id: string; firstVisitDate: Date | null; referralSourceClientId: string | null }[];
+type Cohort = { id: string; firstVisitDate: Date | null; referralSourceClientId: string | null; primaryStaffId: string | null }[];
 
 async function getNewClientCohort(period: ReportPeriod): Promise<Cohort> {
   return prisma.client.findMany({
     where: { firstVisitDate: { gte: period.start, lte: period.end } },
-    select: { id: true, firstVisitDate: true, referralSourceClientId: true },
+    select: { id: true, firstVisitDate: true, referralSourceClientId: true, primaryStaffId: true },
   });
 }
 
@@ -323,6 +396,42 @@ export async function getSecondVisitConversionRate(period: ReportPeriod) {
   return { cohortSize: cohort.length, converted, rate: converted / cohort.length };
 }
 
+/** スタッフ別 初回→2回目移行率(新規顧客のprimaryStaffId基準)。 */
+export async function getStaffSecondVisitConversionRate(period: ReportPeriod) {
+  const cohort = await getNewClientCohort(period);
+  const staff = await prisma.staff.findMany({ select: { id: true, name: true } });
+  const nameOf = new Map(staff.map((s) => [s.id, s.name]));
+  if (cohort.length === 0) return [];
+
+  const visits = await prisma.visit.findMany({
+    where: { clientId: { in: cohort.map((c) => c.id) }, visitNo: 2 },
+    select: { clientId: true, visitDate: true },
+  });
+  const secondVisitByClient = new Map(visits.map((v) => [v.clientId, v.visitDate]));
+
+  const byStaff = new Map<string, { cohortSize: number; converted: number }>();
+  for (const c of cohort) {
+    if (!c.primaryStaffId || !c.firstVisitDate) continue;
+    const cur = byStaff.get(c.primaryStaffId) ?? { cohortSize: 0, converted: 0 };
+    cur.cohortSize++;
+    const second = secondVisitByClient.get(c.id);
+    if (second && second.getTime() - c.firstVisitDate.getTime() <= SECOND_VISIT_FOLLOWUP_DAYS * DAY_MS) {
+      cur.converted++;
+    }
+    byStaff.set(c.primaryStaffId, cur);
+  }
+
+  return Array.from(byStaff.entries())
+    .map(([staffId, v]) => ({
+      staffId,
+      staffName: nameOf.get(staffId) ?? "(不明)",
+      cohortSize: v.cohortSize,
+      converted: v.converted,
+      rate: v.cohortSize > 0 ? v.converted / v.cohortSize : null,
+    }))
+    .sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0));
+}
+
 /** 8. 紹介経由新規人数・紹介率(期間内新規のうち) */
 export async function getReferralStats(period: ReportPeriod) {
   const cohort = await getNewClientCohort(period);
@@ -332,6 +441,32 @@ export async function getReferralStats(period: ReportPeriod) {
     referred,
     rate: cohort.length > 0 ? referred / cohort.length : null,
   };
+}
+
+/** スタッフ別 紹介率(新規顧客のprimaryStaffId基準)。 */
+export async function getStaffReferralStats(period: ReportPeriod) {
+  const cohort = await getNewClientCohort(period);
+  const staff = await prisma.staff.findMany({ select: { id: true, name: true } });
+  const nameOf = new Map(staff.map((s) => [s.id, s.name]));
+
+  const byStaff = new Map<string, { cohortSize: number; referred: number }>();
+  for (const c of cohort) {
+    if (!c.primaryStaffId) continue;
+    const cur = byStaff.get(c.primaryStaffId) ?? { cohortSize: 0, referred: 0 };
+    cur.cohortSize++;
+    if (c.referralSourceClientId) cur.referred++;
+    byStaff.set(c.primaryStaffId, cur);
+  }
+
+  return Array.from(byStaff.entries())
+    .map(([staffId, v]) => ({
+      staffId,
+      staffName: nameOf.get(staffId) ?? "(不明)",
+      cohortSize: v.cohortSize,
+      referred: v.referred,
+      rate: v.cohortSize > 0 ? v.referred / v.cohortSize : null,
+    }))
+    .sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0));
 }
 
 /** 9. 平均通院回数・平均通院期間(期間終了時点で在籍する顧客ベース) */
@@ -358,6 +493,41 @@ export async function getAverageVisitStats(period: ReportPeriod) {
     avgVisitSpanDays: avg(spansDays), // 2回目以降来店した顧客のみが対象(初回のみの顧客は期間0のため除外)
     sampleSize: counts.length,
   };
+}
+
+/** スタッフ別 平均通院回数・平均通院期間(担当顧客ベース)。 */
+export async function getStaffAverageVisitStats(period: ReportPeriod) {
+  const asOf = asOfNow(period);
+  const [clients, stats, staff] = await Promise.all([
+    prisma.client.findMany({
+      where: { firstVisitDate: { lte: asOf }, primaryStaffId: { not: null } },
+      select: { id: true, firstVisitDate: true, primaryStaffId: true },
+    }),
+    getVisitStatsAsOf(asOf),
+    prisma.staff.findMany({ select: { id: true, name: true } }),
+  ]);
+  const nameOf = new Map(staff.map((s) => [s.id, s.name]));
+
+  const byStaff = new Map<string, { counts: number[]; spans: number[] }>();
+  for (const c of clients) {
+    const s = stats.get(c.id);
+    if (!s || !c.firstVisitDate) continue;
+    const key = c.primaryStaffId!;
+    const cur = byStaff.get(key) ?? { counts: [], spans: [] };
+    cur.counts.push(s.visitCount);
+    if (s.visitCount >= 2) cur.spans.push((s.lastVisitDate.getTime() - c.firstVisitDate.getTime()) / DAY_MS);
+    byStaff.set(key, cur);
+  }
+  const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+
+  return Array.from(byStaff.entries())
+    .map(([staffId, v]) => ({
+      staffId,
+      staffName: nameOf.get(staffId) ?? "(不明)",
+      avgVisitCount: avg(v.counts),
+      avgVisitSpanDays: avg(v.spans),
+    }))
+    .sort((a, b) => (b.avgVisitCount ?? 0) - (a.avgVisitCount ?? 0));
 }
 
 /** 10. スタッフ別リピート率(担当顧客のうち2回以上来店した割合) */
@@ -459,7 +629,10 @@ export async function getComplaintAndBodyPartDistribution(period: ReportPeriod) 
  *   (A) その顧客のdepartureRecordのうち、confirmedAtより後で初めての来院である(離脱記録ごとに1回まで)
  *   (B) その来院のChartRecord.isManualReturnFlagがtrue
  */
-export async function countReturnVisits(period: ReportPeriod): Promise<number> {
+export type ReturnVisitRow = { visitId: string; clientId: string; clientName: string; visitDate: Date; staffId: string; staffName: string };
+
+/** 13. 再診数(離脱後の復帰)の対象来院一覧。docs/dashboard-staff-breakdown-spec-v2.md ③ */
+export async function getReturnVisitRows(period: ReportPeriod): Promise<ReturnVisitRow[]> {
   const countedVisitIds = new Set<string>();
 
   const departures = await prisma.departureRecord.findMany({
@@ -494,68 +667,155 @@ export async function countReturnVisits(period: ReportPeriod): Promise<number> {
   });
   for (const v of manualFlagged) countedVisitIds.add(v.id);
 
-  return countedVisitIds.size;
+  if (countedVisitIds.size === 0) return [];
+
+  const [visits, staff] = await Promise.all([
+    prisma.visit.findMany({
+      where: { id: { in: Array.from(countedVisitIds) } },
+      select: { id: true, clientId: true, visitDate: true, staffId: true, client: { select: { name: true } } },
+      orderBy: { visitDate: "desc" },
+    }),
+    prisma.staff.findMany({ select: { id: true, name: true } }),
+  ]);
+  const nameOf = new Map(staff.map((s) => [s.id, s.name]));
+  return visits.map((v) => ({
+    visitId: v.id,
+    clientId: v.clientId,
+    clientName: v.client.name,
+    visitDate: v.visitDate,
+    staffId: v.staffId,
+    staffName: nameOf.get(v.staffId) ?? "(不明)",
+  }));
+}
+
+export async function countReturnVisits(period: ReportPeriod): Promise<number> {
+  return (await getReturnVisitRows(period)).length;
+}
+
+/** 期間内の一覧行をスタッフ別に集計する共通ヘルパー(新規・再診・カルテ枚数など「件数」系の指標に使う)。 */
+function tallyByStaff(rows: { staffId: string | null; staffName: string }[]) {
+  const byStaff = new Map<string, { staffName: string; count: number }>();
+  for (const r of rows) {
+    if (!r.staffId) continue;
+    const cur = byStaff.get(r.staffId) ?? { staffName: r.staffName, count: 0 };
+    cur.count++;
+    byStaff.set(r.staffId, cur);
+  }
+  return Array.from(byStaff.entries())
+    .map(([staffId, v]) => ({ staffId, staffName: v.staffName, count: v.count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/** スタッフ別 新規来院数(新規顧客のprimaryStaffId基準)。 */
+export async function getStaffNewClientCounts(period: ReportPeriod) {
+  return tallyByStaff(await getNewClientsInPeriod(period));
+}
+
+/** スタッフ別 再診数(その来院を担当したstaffId基準)。 */
+export async function getStaffReturnVisitCounts(period: ReportPeriod) {
+  return tallyByStaff(await getReturnVisitRows(period));
+}
+
+/** 期間内のカルテ枚数(ChartRecord件数。1来院=1カルテのため実質「総来院件数」と同義)。 */
+export async function countChartRecords(period: ReportPeriod) {
+  return prisma.chartRecord.count({ where: { visit: { visitDate: { gte: period.start, lte: period.end } } } });
+}
+
+/** スタッフ別 カルテ枚数(その来院を担当したstaffId基準)。docs/dashboard-staff-breakdown-spec-v2.md ⑤ */
+export async function getStaffChartRecordCounts(period: ReportPeriod) {
+  const rows = await prisma.chartRecord.findMany({
+    where: { visit: { visitDate: { gte: period.start, lte: period.end } } },
+    select: { visit: { select: { staffId: true, staff: { select: { name: true } } } } },
+  });
+  return tallyByStaff(rows.map((r) => ({ staffId: r.visit.staffId, staffName: r.visit.staff.name })));
 }
 
 /** ダッシュボード用: 12指標をまとめて取得する。 */
 export async function getDashboardReport(period: ReportPeriod) {
   const [
-    newVisits,
-    churned,
+    newClients,
+    churnedClients,
     overallChurnRate,
     staffChurnRate,
     repeaters6plus,
     repeaters15plus,
+    staffRepeaters15plus,
     repeaterRate6plus,
     staffRepeaterRate6plus,
     staffCaseload,
     channelBreakdown,
     secondVisitConversion,
+    staffSecondVisitConversion,
     referral,
+    staffReferralStats,
     averageVisitStats,
+    staffAverageVisitStats,
     staffRepeatRate,
     prepaidDrain,
     distribution,
-    returnVisits,
+    returnVisitRows,
+    staffNewClientCounts,
+    staffReturnVisitCounts,
+    chartRecordCount,
+    staffChartRecordCounts,
   ] = await Promise.all([
-    countNewVisits(period),
-    countChurned(period),
+    getNewClientsInPeriod(period),
+    getChurnedClientRows(period),
     getOverallChurnRate(period),
     getStaffChurnRate(period),
-    countRepeatersAtLeast(period, 6),
-    countRepeatersAtLeast(period, 15),
+    countRepeatersAtLeast(6),
+    countRepeatersAtLeast(15),
+    getStaffRepeatersAtLeast(15),
     getRepeaterRateAtLeast(period, 6),
     getStaffRepeaterRateAtLeast(period, 6),
     getStaffCaseload(period),
     getChannelBreakdown(period),
     getSecondVisitConversionRate(period),
+    getStaffSecondVisitConversionRate(period),
     getReferralStats(period),
+    getStaffReferralStats(period),
     getAverageVisitStats(period),
+    getStaffAverageVisitStats(period),
     getStaffRepeatRate(period),
     getPrepaidDrainWithoutVisit(period),
     getComplaintAndBodyPartDistribution(period),
-    countReturnVisits(period),
+    getReturnVisitRows(period),
+    getStaffNewClientCounts(period),
+    getStaffReturnVisitCounts(period),
+    countChartRecords(period),
+    getStaffChartRecordCounts(period),
   ]);
 
   return {
     period,
-    newVisits,
-    churned,
+    newVisits: newClients.length,
+    newClients,
+    churned: churnedClients.length,
+    churnedClients,
     overallChurnRate,
     staffChurnRate,
     repeaters6plus,
     repeaters15plus,
+    staffRepeaters15plus,
     repeaterRate6plus,
     staffRepeaterRate6plus,
     staffCaseload,
     channelBreakdown,
     secondVisitConversion,
+    staffSecondVisitConversion,
     referral,
+    staffReferralStats,
     averageVisitStats,
+    staffAverageVisitStats,
     staffRepeatRate,
     prepaidDrain,
     distribution,
-    returnVisits,
+    returnVisits: returnVisitRows.length,
+    returnVisitRows,
+    staffNewClientCounts,
+    staffReturnVisitCounts,
+    chartRecordCount,
+    staffChartRecordCounts,
   };
 }
 

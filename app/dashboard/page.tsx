@@ -69,25 +69,57 @@ export default async function DashboardPage({
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        <StatCard label="新規来院数" value={report.newVisits} />
-        <StatCard label="離脱数(6週間以上・予約なし)" value={report.churned} tone={report.churned > 0 ? "warn" : "default"} />
+        <ListStatCard
+          label="新規来院数"
+          count={report.newVisits}
+          emptyText="この期間の新規はありません"
+          items={report.newClients.map((c) => ({
+            key: c.clientId,
+            href: `/clients/${c.clientId}`,
+            primary: c.clientName,
+            secondary: `${fmtDate(c.firstVisitDate)} ・ ${c.staffName}`,
+          }))}
+        />
+        <ListStatCard
+          label="離脱数(6週間以上・予約なし)"
+          count={report.churned}
+          tone={report.churned > 0 ? "warn" : "default"}
+          emptyText="離脱扱いの顧客はいません"
+          items={report.churnedClients.map((c) => ({
+            key: c.clientId,
+            href: `/clients/${c.clientId}`,
+            primary: c.clientName,
+            secondary: `最終来院 ${fmtDate(c.lastVisitDate)} ・ ${c.staffName}`,
+          }))}
+        />
         <StatCard
           label="離脱率"
           value={fmtPct(report.overallChurnRate.rate)}
           sub={`${report.overallChurnRate.churnedClients}/${report.overallChurnRate.totalClients}人`}
           tone={report.churned > 0 ? "warn" : "default"}
         />
-        <StatCard label="再診数(離脱後の復帰)" value={report.returnVisits} />
+        <ListStatCard
+          label="再診数(離脱後の復帰)"
+          count={report.returnVisits}
+          emptyText="この期間の再診はありません"
+          items={report.returnVisitRows.map((v) => ({
+            key: v.visitId,
+            href: `/clients/${v.clientId}`,
+            primary: v.clientName,
+            secondary: `${fmtDate(v.visitDate)} ・ ${v.staffName}`,
+          }))}
+        />
         <StatCard
           label="6回以上リピーター率"
           value={fmtPct(report.repeaterRate6plus.rate)}
           sub={`${report.repeaterRate6plus.repeaterClients}/${report.repeaterRate6plus.totalClients}人`}
         />
-        <StatCard label="15回以上リピーター" value={report.repeaters15plus} />
+        <StatCard label="15回以上リピーター" value={report.repeaters15plus} sub="現在時点の通算来院回数" />
         <StatCard label="初回→2回目移行率" value={fmtPct(report.secondVisitConversion.rate)} sub={`${report.secondVisitConversion.converted}/${report.secondVisitConversion.cohortSize}人`} />
         <StatCard label="紹介率" value={fmtPct(report.referral.rate)} sub={`紹介 ${report.referral.referred}/${report.referral.cohortSize}人`} />
         <StatCard label="平均通院回数" value={fmtNum(report.averageVisitStats.avgVisitCount)} sub="回" />
         <StatCard label="平均通院期間" value={report.averageVisitStats.avgVisitSpanDays !== null ? Math.round(report.averageVisitStats.avgVisitSpanDays) : "—"} sub="日(2回目以降の顧客)" />
+        <StatCard label="カルテ枚数" value={report.chartRecordCount} sub="件" />
       </div>
 
       {birthdayClients.length > 0 && (
@@ -127,38 +159,106 @@ export default async function DashboardPage({
         </section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-lg border border-stone-200 bg-white p-5">
-          <h2 className="font-semibold mb-3">スタッフ別担当患者数・リピート率・離脱率</h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-stone-500 border-b border-stone-200">
-                <th className="py-1.5 font-normal">スタッフ</th>
-                <th className="py-1.5 font-normal text-right">担当数</th>
-                <th className="py-1.5 font-normal text-right">リピート率</th>
-                <th className="py-1.5 font-normal text-right">6回以上リピート率</th>
-                <th className="py-1.5 font-normal text-right">離脱率</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.staffCaseload.map((s) => {
-                const rr = report.staffRepeatRate.find((r) => r.staffId === s.staffId);
-                const rr6 = report.staffRepeaterRate6plus.find((r) => r.staffId === s.staffId);
-                const cr = report.staffChurnRate.find((r) => r.staffId === s.staffId);
-                return (
-                  <tr key={s.staffId} className="border-b border-stone-100 last:border-0">
-                    <td className="py-1.5">{s.staffName}</td>
-                    <td className="py-1.5 text-right tabular-nums">{s.clientCount}</td>
-                    <td className="py-1.5 text-right tabular-nums">{fmtPct(rr?.repeatRate ?? null)}</td>
-                    <td className="py-1.5 text-right tabular-nums">{fmtPct(rr6?.rate ?? null)}</td>
-                    <td className="py-1.5 text-right tabular-nums">{fmtPct(cr?.rate ?? null)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
+      <section className="rounded-lg border border-stone-200 bg-white p-5 overflow-x-auto">
+        <h2 className="font-semibold mb-3">スタッフ別 主要指標(率)</h2>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-stone-500 border-b border-stone-200">
+              <th className="py-1.5 font-normal">スタッフ</th>
+              <th className="py-1.5 font-normal text-right">担当数</th>
+              <th className="py-1.5 font-normal text-right">リピート率</th>
+              <th className="py-1.5 font-normal text-right">6回以上リピート率</th>
+              <th className="py-1.5 font-normal text-right">離脱率</th>
+              <th className="py-1.5 font-normal text-right">初回→2回目移行率</th>
+              <th className="py-1.5 font-normal text-right">紹介率</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.staffCaseload.map((s) => {
+              const rr = report.staffRepeatRate.find((r) => r.staffId === s.staffId);
+              const rr6 = report.staffRepeaterRate6plus.find((r) => r.staffId === s.staffId);
+              const cr = report.staffChurnRate.find((r) => r.staffId === s.staffId);
+              const sv = report.staffSecondVisitConversion.find((r) => r.staffId === s.staffId);
+              const ref = report.staffReferralStats.find((r) => r.staffId === s.staffId);
+              return (
+                <tr key={s.staffId} className="border-b border-stone-100 last:border-0">
+                  <td className="py-1.5 whitespace-nowrap">{s.staffName}</td>
+                  <td className="py-1.5 text-right tabular-nums">{s.clientCount}</td>
+                  <td className="py-1.5 text-right tabular-nums">{fmtPct(rr?.repeatRate ?? null)}</td>
+                  <td className="py-1.5 text-right tabular-nums">{fmtPct(rr6?.rate ?? null)}</td>
+                  <td className="py-1.5 text-right tabular-nums">{fmtPct(cr?.rate ?? null)}</td>
+                  <td className="py-1.5 text-right tabular-nums">{fmtPct(sv?.rate ?? null)}</td>
+                  <td className="py-1.5 text-right tabular-nums">{fmtPct(ref?.rate ?? null)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
 
+      <section className="rounded-lg border border-stone-200 bg-white p-5 overflow-x-auto">
+        <h2 className="font-semibold mb-3">スタッフ別 件数集計</h2>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-stone-500 border-b border-stone-200">
+              <th className="py-1.5 font-normal">スタッフ</th>
+              <th className="py-1.5 font-normal text-right">新規</th>
+              <th className="py-1.5 font-normal text-right">再診</th>
+              <th className="py-1.5 font-normal text-right">離脱数</th>
+              <th className="py-1.5 font-normal text-right">15回以上リピーター</th>
+              <th className="py-1.5 font-normal text-right">カルテ枚数</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.staffCaseload.map((s) => {
+              const nc = report.staffNewClientCounts.find((r) => r.staffId === s.staffId);
+              const rv = report.staffReturnVisitCounts.find((r) => r.staffId === s.staffId);
+              const cr = report.staffChurnRate.find((r) => r.staffId === s.staffId);
+              const rp15 = report.staffRepeaters15plus.find((r) => r.staffId === s.staffId);
+              const cc = report.staffChartRecordCounts.find((r) => r.staffId === s.staffId);
+              return (
+                <tr key={s.staffId} className="border-b border-stone-100 last:border-0">
+                  <td className="py-1.5 whitespace-nowrap">{s.staffName}</td>
+                  <td className="py-1.5 text-right tabular-nums">{nc?.count ?? 0}</td>
+                  <td className="py-1.5 text-right tabular-nums">{rv?.count ?? 0}</td>
+                  <td className="py-1.5 text-right tabular-nums">{cr?.churnedClients ?? 0}</td>
+                  <td className="py-1.5 text-right tabular-nums">{rp15?.count ?? 0}</td>
+                  <td className="py-1.5 text-right tabular-nums">{cc?.count ?? 0}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="rounded-lg border border-stone-200 bg-white p-5 sm:w-96 overflow-x-auto">
+        <h2 className="font-semibold mb-3">スタッフ別 平均通院</h2>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-stone-500 border-b border-stone-200">
+              <th className="py-1.5 font-normal">スタッフ</th>
+              <th className="py-1.5 font-normal text-right">平均通院回数</th>
+              <th className="py-1.5 font-normal text-right">平均通院期間</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.staffCaseload.map((s) => {
+              const av = report.staffAverageVisitStats.find((r) => r.staffId === s.staffId);
+              return (
+                <tr key={s.staffId} className="border-b border-stone-100 last:border-0">
+                  <td className="py-1.5 whitespace-nowrap">{s.staffName}</td>
+                  <td className="py-1.5 text-right tabular-nums">{fmtNum(av?.avgVisitCount ?? null)}回</td>
+                  <td className="py-1.5 text-right tabular-nums">
+                    {av?.avgVisitSpanDays != null ? `${Math.round(av.avgVisitSpanDays)}日` : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-lg border border-stone-200 bg-white p-5">
           <h2 className="font-semibold mb-3">来店経路別(期間内新規)</h2>
           <table className="w-full text-sm">
@@ -207,6 +307,41 @@ function StatCard({ label, value, sub, tone = "default" }: { label: string; valu
       <div className={`mt-1 text-2xl font-semibold tabular-nums ${tone === "warn" ? "text-amber-900" : "text-stone-900"}`}>{value}</div>
       {sub && <div className="text-xs text-stone-400 mt-0.5">{sub}</div>}
     </div>
+  );
+}
+
+function ListStatCard({
+  label,
+  count,
+  tone = "default",
+  items,
+  emptyText,
+}: {
+  label: string;
+  count: number;
+  tone?: "default" | "warn";
+  items: { key: string; href: string; primary: string; secondary?: string }[];
+  emptyText: string;
+}) {
+  return (
+    <details className={`rounded-lg border p-4 ${tone === "warn" ? "border-amber-300 bg-amber-50" : "border-stone-200 bg-white"}`}>
+      <summary className="cursor-pointer list-none">
+        <div className="text-xs text-stone-500">{label}</div>
+        <div className={`mt-1 text-2xl font-semibold tabular-nums ${tone === "warn" ? "text-amber-900" : "text-stone-900"}`}>{count}</div>
+        <div className="mt-1 text-xs text-emerald-800 underline">一覧を見る</div>
+      </summary>
+      <ul className="mt-3 flex flex-col gap-1 border-t border-stone-200 pt-2 text-xs">
+        {items.length === 0 && <li className="text-stone-400">{emptyText}</li>}
+        {items.map((it) => (
+          <li key={it.key} className="flex items-center justify-between gap-2">
+            <Link href={it.href} className="truncate text-emerald-800 underline">
+              {it.primary}
+            </Link>
+            {it.secondary && <span className="shrink-0 text-stone-500 tabular-nums">{it.secondary}</span>}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
