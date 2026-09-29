@@ -89,7 +89,7 @@ export default async function DashboardPage({
             key: c.clientId,
             href: `/clients/${c.clientId}`,
             primary: c.clientName,
-            secondary: `最終来院 ${fmtDate(c.lastVisitDate)} ・ ${c.staffName}`,
+            secondary: `最終来院 ${c.lastVisitDate ? fmtDate(c.lastVisitDate) : "なし"} ・ ${c.staffName}`,
           }))}
         />
         <StatCard

@@ -97,14 +97,51 @@ async function getRequiredVisitIntervalsAsOf(asOf: Date) {
   return new Map(rows.map((r) => [r.clientId, r.chartRecord!.requiredVisitInterval!]));
 }
 
-/** 離脱扱いのクライアントID一覧(最終来院から「必要来院ペース×3」以上経過 かつ 未来の予約なし)。 */
+/**
+ * asOf時点で「離脱を記録する」操作(confirmDeparture)により手動確認済み、かつまだ復帰(来院)していないクライアントID。
+ * Client.isActiveは現在値のみを保持し履歴を持たないため、過去の期間を見た時にも正確であるよう
+ * DepartureRecord.confirmedAtとその後の来院有無から都度判定する(同一顧客が離脱→復帰を繰り返す場合は直近の記録を使う)。
+ */
+async function getManuallyDepartedClientIds(asOf: Date): Promise<Set<string>> {
+  const departures = await prisma.departureRecord.findMany({
+    where: { confirmedAt: { lte: asOf } },
+    select: { clientId: true, confirmedAt: true },
+    orderBy: { confirmedAt: "desc" },
+    distinct: ["clientId"],
+  });
+  if (departures.length === 0) return new Set();
+
+  const visits = await prisma.visit.findMany({
+    where: { clientId: { in: departures.map((d) => d.clientId) }, visitDate: { lte: asOf } },
+    select: { clientId: true, visitDate: true },
+    orderBy: { visitDate: "desc" },
+    distinct: ["clientId"],
+  });
+  const lastVisitByClient = new Map(visits.map((v) => [v.clientId, v.visitDate]));
+
+  const result = new Set<string>();
+  for (const d of departures) {
+    const lastVisit = lastVisitByClient.get(d.clientId);
+    if (!lastVisit || lastVisit.getTime() <= d.confirmedAt.getTime()) {
+      result.add(d.clientId);
+    }
+  }
+  return result;
+}
+
+/**
+ * 離脱扱いのクライアントID一覧。以下のいずれかを満たす場合に離脱扱いとする(未来の予約がある場合は除く):
+ *   (A) 最終来院から「必要来院ペース×3」以上経過(自動判定)
+ *   (B) スタッフが「離脱を記録する」操作で手動確認済み、かつまだ復帰していない(自動判定の閾値に達していなくても即座に反映される)
+ */
 export async function getChurnedClientIds(asOf: Date = new Date()): Promise<string[]> {
-  const [visitStats, futureReserved, requiredIntervals] = await Promise.all([
+  const [visitStats, futureReserved, requiredIntervals, manuallyDeparted] = await Promise.all([
     getVisitStatsAsOf(asOf),
     getClientsWithFutureReservation(asOf),
     getRequiredVisitIntervalsAsOf(asOf),
+    getManuallyDepartedClientIds(asOf),
   ]);
-  const result: string[] = [];
+  const result = new Set<string>();
   for (const [clientId, stats] of visitStats) {
     if (futureReserved.has(clientId)) continue;
     const interval = requiredIntervals.get(clientId);
@@ -113,10 +150,13 @@ export async function getChurnedClientIds(asOf: Date = new Date()): Promise<stri
       : CHURN_THRESHOLD_DAYS;
     const cutoff = asOf.getTime() - thresholdDays * DAY_MS;
     if (stats.lastVisitDate.getTime() <= cutoff) {
-      result.push(clientId);
+      result.add(clientId);
     }
   }
-  return result;
+  for (const clientId of manuallyDeparted) {
+    if (!futureReserved.has(clientId)) result.add(clientId);
+  }
+  return Array.from(result);
 }
 
 export type NewClientRow = { clientId: string; clientName: string; firstVisitDate: Date; staffId: string | null; staffName: string };
@@ -146,9 +186,12 @@ export async function countNewVisits(period: ReportPeriod) {
   return (await getNewClientsInPeriod(period)).length;
 }
 
-export type ChurnedClientRow = { clientId: string; clientName: string; lastVisitDate: Date; staffId: string | null; staffName: string };
+export type ChurnedClientRow = { clientId: string; clientName: string; lastVisitDate: Date | null; staffId: string | null; staffName: string };
 
-/** 2. 離脱扱いの顧客一覧(期間終了時点)。docs/dashboard-staff-breakdown-spec-v2.md ③ */
+/**
+ * 2. 離脱扱いの顧客一覧(期間終了時点)。docs/dashboard-staff-breakdown-spec-v2.md ③
+ * lastVisitDateは「離脱を記録する」で手動確認された顧客が一度も来院していない場合にnullになりうる。
+ */
 export async function getChurnedClientRows(period: ReportPeriod): Promise<ChurnedClientRow[]> {
   const asOf = asOfNow(period);
   const ids = await getChurnedClientIds(asOf);
@@ -163,11 +206,11 @@ export async function getChurnedClientRows(period: ReportPeriod): Promise<Churne
     .map((c) => ({
       clientId: c.id,
       clientName: c.name,
-      lastVisitDate: stats.get(c.id)!.lastVisitDate,
+      lastVisitDate: stats.get(c.id)?.lastVisitDate ?? null,
       staffId: c.primaryStaffId,
       staffName: c.primaryStaffId ? (nameOf.get(c.primaryStaffId) ?? "(不明)") : "未設定",
     }))
-    .sort((a, b) => a.lastVisitDate.getTime() - b.lastVisitDate.getTime());
+    .sort((a, b) => (a.lastVisitDate?.getTime() ?? 0) - (b.lastVisitDate?.getTime() ?? 0));
 }
 
 /** 2. 離脱数(期間終了時点) */

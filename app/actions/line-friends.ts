@@ -38,6 +38,26 @@ export async function linkLineFriend(lineFriendId: string, formData: FormData) {
   revalidatePath("/line-friends");
 }
 
+/** 誤ってリンクしてしまった場合に、紐づけだけを解除する(顧客情報自体は削除しない)。 */
+export async function unlinkLineFriend(lineFriendId: string) {
+  const session = await auth();
+  const staffId = session?.user?.id;
+  if (!staffId) throw new Error("ログインが必要です");
+
+  const friend = await prisma.lineFriend.findUniqueOrThrow({ where: { id: lineFriendId } });
+  if (!friend.linkedClientId) return;
+
+  await prisma.$transaction([
+    prisma.lineFriend.update({
+      where: { id: lineFriendId },
+      data: { linkedClientId: null, linkedAt: null, linkedByStaffId: null },
+    }),
+    prisma.client.update({ where: { id: friend.linkedClientId }, data: { lineUserId: null } }),
+  ]);
+
+  revalidatePath("/line-friends");
+}
+
 export type BackfillResult =
   | { status: "ok"; created: number; total: number }
   | { status: "no_token" }

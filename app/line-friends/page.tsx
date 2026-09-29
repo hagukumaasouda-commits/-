@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { linkLineFriend } from "@/app/actions/line-friends";
 import { BackfillButton } from "./backfill-button";
+import { UnlinkButton } from "./unlink-button";
 
 function fmtDateTime(d: Date) {
   return d.toISOString().slice(0, 16).replace("T", " ");
@@ -97,7 +98,7 @@ export default async function LineFriendsPage() {
         {linked.length === 0 && <p className="text-sm text-stone-400">リンク済みの友だちはいません</p>}
         <ul className="flex flex-col divide-y divide-stone-100">
           {linked.map((f) => (
-            <li key={f.id} className="py-2 flex items-center justify-between text-sm">
+            <li key={f.id} className="py-2 flex items-center justify-between gap-2 text-sm">
               <span>
                 {f.displayName ?? "(表示名不明)"} →{" "}
                 {f.linkedClient && (
@@ -106,9 +107,12 @@ export default async function LineFriendsPage() {
                   </Link>
                 )}
               </span>
-              <span className="text-xs text-stone-400">
-                {f.linkedAt && fmtDateTime(f.linkedAt)}
-                {f.linkedByStaff && ` ・ ${f.linkedByStaff.name}`}
+              <span className="flex items-center gap-3 shrink-0">
+                <span className="text-xs text-stone-400">
+                  {f.linkedAt && fmtDateTime(f.linkedAt)}
+                  {f.linkedByStaff && ` ・ ${f.linkedByStaff.name}`}
+                </span>
+                {f.linkedClient && <UnlinkButton lineFriendId={f.id} clientName={f.linkedClient.name} />}
               </span>
             </li>
           ))}
