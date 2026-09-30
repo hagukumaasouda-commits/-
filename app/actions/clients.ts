@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ClientRank, ReferralSourceType, RegistrationType } from "@/app/generated/prisma/client";
+import { deleteClientPhoto as deletePhotoFromStorage } from "@/lib/supabase-storage";
 
 /** 「氏名 #id」形式のデータリスト候補から選択されたIDを取り出す(docs/referral-source-registration-type-spec-v2.md)。 */
 function parseReferralSource(formData: FormData, excludeClientId?: string) {
@@ -183,7 +184,11 @@ export async function updateClient(clientId: string, formData: FormData) {
  * ここでは呼び出し側(編集画面)の確認ダイアログで件数を示すに留め、削除自体は止めない。
  */
 export async function deleteClient(clientId: string) {
+  const photos = await prisma.clientPhoto.findMany({ where: { clientId }, select: { storagePath: true } });
+
   await prisma.$transaction(async (tx) => {
+    await tx.clientPhoto.deleteMany({ where: { clientId } });
+
     const visits = await tx.visit.findMany({ where: { clientId }, select: { id: true } });
     const visitIds = visits.map((v) => v.id);
 
@@ -247,6 +252,12 @@ export async function deleteClient(clientId: string) {
     await tx.client.delete({ where: { id: clientId } });
   }, { timeout: 20000 });
 
+  // Supabase Storage側のファイル削除はDBトランザクションの外(失敗してもDB削除自体はやり直せないため、
+  // ベストエフォートで消す。消し残しがあってもDB上の紐付けは既に無いので実害は無い)。
+  for (const p of photos) {
+    await deletePhotoFromStorage(p.storagePath).catch(() => {});
+  }
+
   redirect("/clients");
 }
 
@@ -307,6 +318,7 @@ export async function mergeClients(keepId: string, formData: FormData) {
     await tx.departureRecord.updateMany({ where: { clientId: mergeId }, data: { clientId: keepId } });
     await tx.reassignmentRequest.updateMany({ where: { clientId: mergeId }, data: { clientId: keepId } });
     await tx.treatmentCourse.updateMany({ where: { clientId: mergeId }, data: { clientId: keepId } });
+    await tx.clientPhoto.updateMany({ where: { clientId: mergeId }, data: { clientId: keepId } });
 
     // 4. 複数担当(ClientStaff): keepに無い担当だけ追加してからmergeの割り当てを削除
     const [keepAssignments, mergeAssignments] = await Promise.all([

@@ -12,6 +12,8 @@ import { setNextAppointment, cancelNextAppointment } from "@/app/actions/appoint
 import { getClientPurchaseHistory } from "@/lib/product-reports";
 import { DeleteVisitButton } from "./visits/delete-visit-button";
 import { ProductSaleRow } from "@/app/products/product-sale-row";
+import { ClientPhotosSection } from "./client-photos-section";
+import { getClientPhotoSignedUrls } from "@/lib/supabase-storage";
 import {
   VISIT_INTERVAL_LABEL as visitIntervalLabel,
   HEALTH_HAPPINESS_LABEL as healthHappinessScoreLabel,
@@ -90,6 +92,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         orderBy: { createdAt: "desc" },
         include: { currentStaff: true, newStaff: true, requestedByStaff: true },
       },
+      photos: {
+        orderBy: [{ category: "asc" }, { takenAt: "desc" }],
+        include: { uploadedBy: { select: { name: true } } },
+      },
     },
   });
   if (!client) notFound();
@@ -116,6 +122,16 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   );
 
   const latestVisit = client.visits[0];
+
+  const photoSignedUrls = await getClientPhotoSignedUrls(client.photos.map((p) => p.storagePath));
+  const photosWithUrl = client.photos.map((p) => ({
+    id: p.id,
+    category: p.category,
+    takenAt: p.takenAt,
+    note: p.note,
+    uploadedBy: p.uploadedBy,
+    signedUrl: photoSignedUrls.get(p.storagePath) ?? null,
+  }));
 
   return (
     <div className="flex flex-col gap-8">
@@ -629,6 +645,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           </p>
         </details>
       </section>
+
+      <ClientPhotosSection clientId={client.id} photos={photosWithUrl} />
 
       <section className="rounded-lg border border-stone-200 bg-white p-5">
         <h2 className="font-semibold mb-3">来院タイムライン</h2>

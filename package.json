@@ -13,6 +13,7 @@
     "@anthropic-ai/sdk": "^0.122.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "7.10.0",
+    "@supabase/supabase-js": "^2.117.2",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "iconv-lite": "^0.7.3",

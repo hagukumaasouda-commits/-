@@ -1,4 +1,4 @@
-import { VisitInterval, HealthHappinessScore, ClientRank, MenuPlan, ProductCategory } from "@/app/generated/prisma/client";
+import { VisitInterval, HealthHappinessScore, ClientRank, MenuPlan, ProductCategory, ClientPhotoCategory } from "@/app/generated/prisma/client";
 
 // カルテのタグ選択肢。集計(来院理由・部位別分布)の粒度をここで揃える。
 export const CHIEF_COMPLAINT_TAGS = [
@@ -114,6 +114,16 @@ export const RANK_OPTIONS: { value: ClientRank; label: string }[] = [
   { value: "C2", label: "C2" },
   { value: "C3", label: "C3" },
 ];
+
+// 写真記録の区分(姿勢・インボディ)。docs/client-photos-spec-v2.md
+export const CLIENT_PHOTO_CATEGORY_OPTIONS: { value: ClientPhotoCategory; label: string }[] = [
+  { value: "POSTURE", label: "姿勢" },
+  { value: "INBODY", label: "インボディ" },
+  { value: "OTHER", label: "他" },
+];
+export const CLIENT_PHOTO_CATEGORY_LABEL: Record<ClientPhotoCategory, string> = Object.fromEntries(
+  CLIENT_PHOTO_CATEGORY_OPTIONS.map((o) => [o.value, o.label])
+) as Record<ClientPhotoCategory, string>;
 
 // 基本検査記録(立位・座位・背臥位)。docs/basic-exam-cheatsheet-spec-v2.md
 export const DISTORTION_TAGS = ["捻じれ", "膨隆", "中心軸逸脱"] as const;

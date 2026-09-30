@@ -40,6 +40,7 @@ model Staff {
   reassignmentsRequested  ReassignmentRequest[] @relation("ReassignmentRequestedBy")
   reassignmentsAsNewStaff ReassignmentRequest[] @relation("ReassignmentNewStaff")
   lineFriendsLinked       LineFriend[]          @relation("LineFriendLinkedBy")
+  clientPhotosUploaded    ClientPhoto[]
 }
 
 enum StaffRole {
@@ -119,6 +120,7 @@ model Client {
   departureRecords     DepartureRecord[]
   reassignmentRequests ReassignmentRequest[]
   lineFriend           LineFriend?
+  photos               ClientPhoto[]
 
   @@index([acquisitionChannelId])
   @@index([primaryStaffId])
@@ -162,6 +164,31 @@ model ClientStaff {
   staff    Staff  @relation(fields: [staffId], references: [id])
 
   @@id([clientId, staffId])
+}
+
+// 姿勢写真・インボディ結果の写真記録(docs/client-photos-spec-v2.md)。
+// 画像本体はSupabase Storage(非公開バケット)に置き、ここにはパスのみ保持する。
+model ClientPhoto {
+  id       String              @id @default(cuid())
+  clientId String
+  client   Client              @relation(fields: [clientId], references: [id])
+  category ClientPhotoCategory
+
+  storagePath String // Supabase Storage内のパス({clientId}/{cuid}.{ext})
+  takenAt     DateTime // 撮影日(スタッフが指定。既定は登録日)
+  note        String? // 任意メモ(例:「施術前」「3ヶ月後」)
+
+  uploadedById String
+  uploadedBy   Staff    @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([clientId, category, takenAt])
+}
+
+enum ClientPhotoCategory {
+  POSTURE // 姿勢
+  INBODY // インボディ
+  OTHER // その他
 }
 
 // ---------------------------------------------------------------------------

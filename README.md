@@ -19,6 +19,14 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
    - **Transaction pooler(ポート `6543`)** — アプリの実行時(`DATABASE_URL`)用。Vercelのサーバーレス関数から多数の短時間接続が来ることを想定したプーリング接続
    - **Direct connection(ポート `5432`)** — マイグレーション実行時のみ使用(下記手順3)
 
+### 1-2. Supabase Storage(写真記録用のバケット作成)
+
+姿勢写真・インボディ結果の画像は、データベースと同じSupabaseプロジェクト内のStorageに保存します(要配慮個人情報のため、DBと同じ国内リージョンに揃える方針。詳細は`docs/client-photos-spec-v2.md`)。
+
+1. Supabaseダッシュボードの「Storage」から新規バケットを作成。バケット名は `client-photos`
+2. **「Public bucket」は必ずオフのまま**(非公開バケット。画像はアプリがサーバー側で発行する署名付きURL経由でのみ配信します)
+3. 「Project Settings → API」から `Project URL` と `service_role` キー(`anon`キーではない点に注意。Storageへのフルアクセス権限を持つ秘密の値)を取得し、それぞれ `SUPABASE_URL`・`SUPABASE_SERVICE_ROLE_KEY` として後述のVercel環境変数に設定する
+
 ### 2. Vercel(アプリ本体)
 
 1. https://vercel.com でアカウント作成(GitHubログイン)
@@ -33,6 +41,8 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
    | `ANTHROPIC_API_KEY` | Anthropic APIキー |
    | `LINE_CHANNEL_ACCESS_TOKEN` | LINE公式アカウントのチャネルアクセストークン |
    | `LINE_CHANNEL_SECRET` | LINE Webhookの署名検証用チャネルシークレット(トークンとは別の値) |
+   | `SUPABASE_URL` | 手順1-2で確認したSupabaseプロジェクトURL |
+   | `SUPABASE_SERVICE_ROLE_KEY` | 手順1-2で確認した`service_role`キー(写真記録のStorageアクセス用) |
    | `APP_TZ` | `Asia/Tokyo`(来店日時のタイムゾーンを正しく扱うために必須。Vercelでは変数名 `TZ` が予約済みのため `APP_TZ` という名前で受け取り、`instrumentation.ts` が起動時に反映します) |
 
 5. 「Deploy」をクリック
@@ -107,6 +117,8 @@ cp .env.example .env
 | `ANTHROPIC_MODEL` | AI気づきに使うモデルID(省略時 `claude-opus-5`) | 省略可 |
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINEリマインド送信・友だち一覧取得用 | 未設定だとリマインド送信・遡及登録が失敗します(理由をUIに表示) |
 | `LINE_CHANNEL_SECRET` | `/api/line/webhook` の署名検証用 | 未設定だとWebhookは全リクエストを401で拒否します |
+| `SUPABASE_URL` | 姿勢写真・インボディ結果の画像を保存するSupabase StorageのプロジェクトURL | 未設定だと写真の登録・表示・削除がすべて失敗します |
+| `SUPABASE_SERVICE_ROLE_KEY` | 同Storageへのアクセスキー(`anon`キーではなく`service_role`キー) | 同上 |
 
 ### 4. マイグレーション・シード投入
 
