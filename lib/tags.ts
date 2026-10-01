@@ -73,7 +73,7 @@ export const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = Object.fr
 ) as Record<ProductCategory, string>;
 
 // 物療チェック(生活習慣サポートとは別概念。新規フィールド)。
-export const TREATMENT_MODALITY_ITEMS = ["コアレ10", "コアレ20", "ブースター", "セラゼム", "鍼", "灸"] as const;
+export const TREATMENT_MODALITY_ITEMS = ["コアレ10", "コアレ20", "ブースター", "セラゼム", "鍼", "灸", "ニュースキャン"] as const;
 
 // 必要来院ペース(docs/departure-followup-spec-v2.md v3、顧客管理シートの実際の選択肢と一致)。
 // 表示名・enum・CSVインポートでのラベル逆引きの単一の情報源。
