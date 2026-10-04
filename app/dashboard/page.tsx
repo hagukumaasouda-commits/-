@@ -81,15 +81,15 @@ export default async function DashboardPage({
           }))}
         />
         <ListStatCard
-          label="離脱数(6週間以上・予約なし)"
+          label="離脱数(その月の新規)"
           count={report.churned}
           tone={report.churned > 0 ? "warn" : "default"}
-          emptyText="離脱扱いの顧客はいません"
+          emptyText="この期間に新たに離脱と判定された顧客はいません"
           items={report.churnedClients.map((c) => ({
             key: c.clientId,
             href: `/clients/${c.clientId}`,
             primary: c.clientName,
-            secondary: `最終来院 ${c.lastVisitDate ? fmtDate(c.lastVisitDate) : "なし"} ・ ${c.staffName}`,
+            secondary: `離脱判定 ${fmtDate(c.churnDate)}${c.lastVisitDate ? `(最終来院 ${fmtDate(c.lastVisitDate)})` : ""} ・ ${c.staffName}`,
           }))}
         />
         <StatCard

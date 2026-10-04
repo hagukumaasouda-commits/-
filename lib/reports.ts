@@ -186,34 +186,133 @@ export async function countNewVisits(period: ReportPeriod) {
   return (await getNewClientsInPeriod(period)).length;
 }
 
-export type ChurnedClientRow = { clientId: string; clientName: string; lastVisitDate: Date | null; staffId: string | null; staffName: string };
+export type ChurnEvent = {
+  clientId: string;
+  clientName: string;
+  churnDate: Date; // 離脱と判定された日
+  lastVisitDate: Date | null; // その離脱の直前の来院日(手動判定のみの場合はnull)
+  staffId: string | null;
+  staffName: string;
+  source: "pace" | "manual";
+};
 
 /**
- * 2. 離脱扱いの顧客一覧(期間終了時点)。docs/dashboard-staff-breakdown-spec-v2.md ③
- * lastVisitDateは「離脱を記録する」で手動確認された顧客が一度も来院していない場合にnullになりうる。
+ * 全顧客の「離脱と判定された日」を、来院間隔の履歴全体から再構成する(docs/churn-monthly-reset-spec-v2.md)。
+ * スナップショット(今現在離脱中かどうか)ではなく、過去に発生して既に解消された間隔も含めた
+ * イベントログとして返す。月次集計(その月に新たに何件離脱したか)が、後から見ても変動しないようにするため。
+ * 「現在離脱中かどうか」を見る運用機能(離脱フォローアップ候補・プリカ残高消化ペース検出)は
+ * 従来通り getChurnedClientIds のスナップショットを使い続けるため、この関数とは独立させている。
  */
-export async function getChurnedClientRows(period: ReportPeriod): Promise<ChurnedClientRow[]> {
-  const asOf = asOfNow(period);
-  const ids = await getChurnedClientIds(asOf);
-  if (ids.length === 0) return [];
-  const [clients, stats, staff] = await Promise.all([
-    prisma.client.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, primaryStaffId: true } }),
-    getVisitStatsAsOf(asOf),
+async function getAllChurnEvents(): Promise<ChurnEvent[]> {
+  const now = new Date();
+  const [clients, visits, departures, staff, futureReserved] = await Promise.all([
+    prisma.client.findMany({ select: { id: true, name: true, primaryStaffId: true } }),
+    prisma.visit.findMany({
+      select: { clientId: true, visitDate: true, chartRecord: { select: { requiredVisitInterval: true } } },
+      orderBy: { visitDate: "asc" },
+    }),
+    prisma.departureRecord.findMany({ select: { clientId: true, confirmedAt: true } }),
     prisma.staff.findMany({ select: { id: true, name: true } }),
+    getClientsWithFutureReservation(now),
   ]);
   const nameOf = new Map(staff.map((s) => [s.id, s.name]));
-  return clients
-    .map((c) => ({
-      clientId: c.id,
-      clientName: c.name,
-      lastVisitDate: stats.get(c.id)?.lastVisitDate ?? null,
-      staffId: c.primaryStaffId,
-      staffName: c.primaryStaffId ? (nameOf.get(c.primaryStaffId) ?? "(不明)") : "未設定",
-    }))
-    .sort((a, b) => (a.lastVisitDate?.getTime() ?? 0) - (b.lastVisitDate?.getTime() ?? 0));
+  const clientInfo = new Map(clients.map((c) => [c.id, c]));
+  const staffNameOfClient = (clientId: string) => {
+    const staffId = clientInfo.get(clientId)?.primaryStaffId ?? null;
+    return { staffId, staffName: staffId ? nameOf.get(staffId) ?? "(不明)" : "未設定" };
+  };
+
+  const visitsByClient = new Map<string, { visitDate: Date; interval: VisitInterval | null }[]>();
+  for (const v of visits) {
+    const list = visitsByClient.get(v.clientId) ?? [];
+    list.push({ visitDate: v.visitDate, interval: v.chartRecord?.requiredVisitInterval ?? null });
+    visitsByClient.set(v.clientId, list);
+  }
+
+  const manualDatesByClient = new Map<string, Date[]>();
+  for (const d of departures) {
+    const list = manualDatesByClient.get(d.clientId) ?? [];
+    list.push(d.confirmedAt);
+    manualDatesByClient.set(d.clientId, list);
+  }
+
+  const manualEvents: ChurnEvent[] = departures.map((d) => ({
+    clientId: d.clientId,
+    clientName: clientInfo.get(d.clientId)?.name ?? "(不明)",
+    churnDate: d.confirmedAt,
+    lastVisitDate: null,
+    ...staffNameOfClient(d.clientId),
+    source: "manual" as const,
+  }));
+
+  const paceEvents: ChurnEvent[] = [];
+  for (const [clientId, clientVisits] of visitsByClient) {
+    let currentInterval: VisitInterval | null = null;
+    const manualDates = manualDatesByClient.get(clientId) ?? [];
+
+    for (let i = 0; i < clientVisits.length; i++) {
+      if (clientVisits[i].interval) currentInterval = clientVisits[i].interval;
+      const thresholdDays = currentInterval
+        ? VISIT_INTERVAL_DAYS[currentInterval] * CHURN_INTERVAL_MULTIPLIER
+        : CHURN_THRESHOLD_DAYS;
+      const isLastVisit = i + 1 >= clientVisits.length;
+      const nextDate = isLastVisit ? now : clientVisits[i + 1].visitDate;
+      const gapDays = (nextDate.getTime() - clientVisits[i].visitDate.getTime()) / DAY_MS;
+      if (gapDays <= thresholdDays) continue;
+
+      if (isLastVisit && futureReserved.has(clientId)) continue;
+
+      // この間隔中にスタッフが手動確認していれば、具体的な確定日を持つ手動判定側に任せる(二重カウント防止)
+      const manualInThisGap = manualDates.some(
+        (d) => d.getTime() >= clientVisits[i].visitDate.getTime() && d.getTime() <= nextDate.getTime()
+      );
+      if (manualInThisGap) continue;
+
+      paceEvents.push({
+        clientId,
+        clientName: clientInfo.get(clientId)?.name ?? "(不明)",
+        churnDate: new Date(clientVisits[i].visitDate.getTime() + thresholdDays * DAY_MS),
+        lastVisitDate: clientVisits[i].visitDate,
+        ...staffNameOfClient(clientId),
+        source: "pace",
+      });
+    }
+  }
+
+  return [...paceEvents, ...manualEvents];
 }
 
-/** 2. 離脱数(期間終了時点) */
+/** 指定期間内に「離脱と判定された」イベント一覧(発生月で区切るため、期間を移動しても過去の分は数え直されない)。 */
+export async function getNewlyChurnedInPeriod(period: ReportPeriod): Promise<ChurnEvent[]> {
+  const events = await getAllChurnEvents();
+  return events
+    .filter((e) => e.churnDate.getTime() >= period.start.getTime() && e.churnDate.getTime() <= period.end.getTime())
+    .sort((a, b) => a.churnDate.getTime() - b.churnDate.getTime());
+}
+
+export type ChurnedClientRow = {
+  clientId: string;
+  clientName: string;
+  lastVisitDate: Date | null;
+  churnDate: Date;
+  staffId: string | null;
+  staffName: string;
+};
+
+/** 2. その月に新たに離脱と判定された顧客一覧。docs/churn-monthly-reset-spec-v2.md */
+export async function getChurnedClientRows(period: ReportPeriod): Promise<ChurnedClientRow[]> {
+  const events = await getNewlyChurnedInPeriod(period);
+  return events.map((e) => ({
+    clientId: e.clientId,
+    clientName: e.clientName,
+    lastVisitDate: e.lastVisitDate,
+    churnDate: e.churnDate,
+    staffId: e.staffId,
+    staffName: e.staffName,
+  }));
+}
+
+/** 2. その月に新たに離脱と判定された人数 */
 export async function countChurned(period: ReportPeriod) {
   return (await getChurnedClientRows(period)).length;
 }
@@ -256,32 +355,32 @@ export async function getStaffRepeatersAtLeast(minVisits: number) {
     .sort((a, b) => b.count - a.count);
 }
 
-/** 全体の離脱率(期間終了時点で在籍する全顧客のうち、離脱扱いになっている割合) */
+/** 全体の離脱率(その月に新たに離脱と判定された人数 ÷ 期間終了時点で在籍する全顧客数) */
 export async function getOverallChurnRate(period: ReportPeriod) {
   const asOf = asOfNow(period);
-  const [totalClients, churnedIds] = await Promise.all([
+  const [totalClients, newlyChurned] = await Promise.all([
     prisma.client.count({ where: { firstVisitDate: { lte: asOf } } }),
-    getChurnedClientIds(asOf),
+    getNewlyChurnedInPeriod(period),
   ]);
   return {
     totalClients,
-    churnedClients: churnedIds.length,
-    rate: totalClients > 0 ? churnedIds.length / totalClients : null,
+    churnedClients: newlyChurned.length,
+    rate: totalClients > 0 ? newlyChurned.length / totalClients : null,
   };
 }
 
-/** スタッフ別離脱率(担当顧客のうち離脱扱いになっている割合) */
+/** スタッフ別離脱率(担当顧客のうち、その月に新たに離脱と判定された割合) */
 export async function getStaffChurnRate(period: ReportPeriod) {
   const asOf = asOfNow(period);
-  const [clients, churnedIds, staff] = await Promise.all([
+  const [clients, newlyChurned, staff] = await Promise.all([
     prisma.client.findMany({
       where: { firstVisitDate: { lte: asOf }, primaryStaffId: { not: null } },
       select: { id: true, primaryStaffId: true },
     }),
-    getChurnedClientIds(asOf),
+    getNewlyChurnedInPeriod(period),
     prisma.staff.findMany({ select: { id: true, name: true } }),
   ]);
-  const churnedSet = new Set(churnedIds);
+  const churnedSet = new Set(newlyChurned.map((e) => e.clientId));
   const nameOf = new Map(staff.map((s) => [s.id, s.name]));
 
   const byStaff = new Map<string, { total: number; churned: number }>();
