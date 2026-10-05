@@ -1,4 +1,12 @@
-import { VisitInterval, HealthHappinessScore, ClientRank, MenuPlan, ProductCategory, ClientPhotoCategory } from "@/app/generated/prisma/client";
+import {
+  VisitInterval,
+  HealthHappinessScore,
+  ClientRank,
+  MenuPlan,
+  ProductCategory,
+  ClientPhotoCategory,
+  ProductStockMovementType,
+} from "@/app/generated/prisma/client";
 
 // カルテのタグ選択肢。集計(来院理由・部位別分布)の粒度をここで揃える。
 export const CHIEF_COMPLAINT_TAGS = [
@@ -71,6 +79,16 @@ export const PRODUCT_CATEGORY_OPTIONS: { value: ProductCategory; label: string }
 export const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = Object.fromEntries(
   PRODUCT_CATEGORY_OPTIONS.map((o) => [o.value, o.label])
 ) as Record<ProductCategory, string>;
+
+// 在庫の入出庫種別。docs/departure-reason-edit-stock-movement-spec-v2.md
+export const PRODUCT_STOCK_MOVEMENT_TYPE_OPTIONS: { value: ProductStockMovementType; label: string }[] = [
+  { value: "PURCHASE", label: "仕入れ" },
+  { value: "TRANSFER_OUT", label: "他店舗へ移動" },
+  { value: "ADJUSTMENT", label: "棚卸調整" },
+];
+export const PRODUCT_STOCK_MOVEMENT_TYPE_LABEL: Record<ProductStockMovementType, string> = Object.fromEntries(
+  PRODUCT_STOCK_MOVEMENT_TYPE_OPTIONS.map((o) => [o.value, o.label])
+) as Record<ProductStockMovementType, string>;
 
 // 物療チェック(生活習慣サポートとは別概念。新規フィールド)。
 export const TREATMENT_MODALITY_ITEMS = ["コアレ10", "コアレ20", "ブースター", "セラゼム", "鍼", "灸", "ニュースキャン"] as const;

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { ProductItemType, ProductPurchaseType, ProductCategory } from "@/app/generated/prisma/client";
+import { ProductItemType, ProductPurchaseType, ProductCategory, ProductStockMovementType } from "@/app/generated/prisma/client";
+import { getCurrentStock } from "@/lib/product-reports";
 
 // 商品マスタは「あとで追加・修正できる」運用にするため、ここで作成・編集の両方を扱う
 // (仕様書 chart-prepaid-product-spec-v2.md 3.3)。
@@ -90,40 +91,66 @@ export async function deleteProductSale(saleId: string) {
   revalidatePath("/products");
 }
 
-function parseStockInFields(formData: FormData) {
+function parseCommonStockFields(formData: FormData) {
   const productId = String(formData.get("productId") || "");
-  const quantityRaw = Number(formData.get("quantity"));
-  if (!productId || !Number.isFinite(quantityRaw) || quantityRaw <= 0) {
-    throw new Error("商品と数量(1以上)を入力してください");
-  }
+  if (!productId) throw new Error("商品を選択してください");
   const stockInDateRaw = String(formData.get("stockInDate") || "");
   const staffId = String(formData.get("staffId") || "") || null;
   const note = String(formData.get("note") || "") || null;
 
-  return {
-    productId,
-    quantity: Math.trunc(quantityRaw),
-    stockInDate: stockInDateRaw ? new Date(stockInDateRaw) : new Date(),
-    staffId,
-    note,
-  };
+  return { productId, stockInDate: stockInDateRaw ? new Date(stockInDateRaw) : new Date(), staffId, note };
 }
 
-/** 仕入れ(在庫の入荷)を記録する。 */
-export async function recordStockIn(formData: FormData) {
-  const fields = parseStockInFields(formData);
-  await prisma.productStockIn.create({ data: fields });
+/** 入出庫(仕入れ・他店舗への移動・棚卸調整)を記録する。docs/departure-reason-edit-stock-movement-spec-v2.md */
+export async function recordStockMovement(formData: FormData) {
+  const common = parseCommonStockFields(formData);
+  const type = String(formData.get("movementType") || "PURCHASE") as ProductStockMovementType;
+
+  let quantity: number;
+  let destination: string | null = null;
+
+  if (type === ProductStockMovementType.PURCHASE) {
+    const q = Number(formData.get("quantity"));
+    if (!Number.isFinite(q) || q <= 0) throw new Error("数量(1以上)を入力してください");
+    quantity = Math.trunc(q);
+  } else if (type === ProductStockMovementType.TRANSFER_OUT) {
+    const q = Number(formData.get("quantity"));
+    if (!Number.isFinite(q) || q <= 0) throw new Error("数量(1以上)を入力してください");
+    quantity = -Math.trunc(q);
+    destination = String(formData.get("destination") || "") || null;
+  } else {
+    const targetRaw = Number(formData.get("currentStockInput"));
+    if (!Number.isFinite(targetRaw) || targetRaw < 0) throw new Error("現在の実在庫数(0以上)を入力してください");
+    const currentStock = await getCurrentStock(common.productId);
+    quantity = Math.trunc(targetRaw) - currentStock;
+  }
+
+  await prisma.productStockIn.create({ data: { ...common, type, quantity, destination } });
   revalidatePath("/products/inventory");
 }
 
-/** 仕入れ記録の入力ミスを修正する。 */
-export async function updateStockIn(stockInId: string, formData: FormData) {
-  const fields = parseStockInFields(formData);
-  await prisma.productStockIn.update({ where: { id: stockInId }, data: fields });
+/** 仕入れ・他店舗への移動の入力ミスを修正する(棚卸調整は差分固定のため日付・担当・メモのみ修正可能)。 */
+export async function updateStockMovement(stockInId: string, formData: FormData) {
+  const existing = await prisma.productStockIn.findUniqueOrThrow({ where: { id: stockInId }, select: { type: true } });
+  const common = parseCommonStockFields(formData);
+
+  if (existing.type === ProductStockMovementType.ADJUSTMENT) {
+    await prisma.productStockIn.update({ where: { id: stockInId }, data: common });
+    revalidatePath("/products/inventory");
+    return;
+  }
+
+  const q = Number(formData.get("quantity"));
+  if (!Number.isFinite(q) || q <= 0) throw new Error("数量(1以上)を入力してください");
+  const quantity = existing.type === ProductStockMovementType.TRANSFER_OUT ? -Math.trunc(q) : Math.trunc(q);
+  const destination =
+    existing.type === ProductStockMovementType.TRANSFER_OUT ? String(formData.get("destination") || "") || null : null;
+
+  await prisma.productStockIn.update({ where: { id: stockInId }, data: { ...common, quantity, destination } });
   revalidatePath("/products/inventory");
 }
 
-/** 誤って入力した仕入れ記録を削除する。 */
+/** 誤って入力した入出庫記録を削除する。 */
 export async function deleteStockIn(stockInId: string) {
   await prisma.productStockIn.delete({ where: { id: stockInId } });
   revalidatePath("/products/inventory");

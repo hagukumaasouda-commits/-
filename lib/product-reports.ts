@@ -253,41 +253,63 @@ export type InventoryStatus = {
   name: string;
   category: ProductCategory;
   active: boolean;
-  totalStockIn: number;
+  totalPurchased: number;
+  totalTransferredOut: number; // 負の値(他店舗へ渡した分)
+  totalAdjustment: number; // 棚卸調整の合計(正負どちらも)
   totalSold: number;
   currentStock: number;
 };
 
 /**
- * 商品ごとの現在庫 = 仕入れ数量の合計 - 販売数量の合計。
+ * 商品ごとの現在庫 = 入出庫数量(符号付き。仕入れ=正、他店舗への移動=負、棚卸調整=正負)の合計 - 販売数量の合計。
  * ProductSale.quantityが未記録の行(CSV取り込み分の一部)は販売数量に反映されない
  * ため、その分だけ在庫が実際より多く表示される制約がある(手入力運用の限界)。
  */
 export async function getInventoryStatus(): Promise<InventoryStatus[]> {
-  const [products, stockInSums, saleSums] = await Promise.all([
+  const [products, movementSums, saleSums] = await Promise.all([
     prisma.product.findMany({ orderBy: [{ active: "desc" }, { name: "asc" }] }),
-    prisma.productStockIn.groupBy({ by: ["productId"], _sum: { quantity: true } }),
+    prisma.productStockIn.groupBy({ by: ["productId", "type"], _sum: { quantity: true } }),
     prisma.productSale.groupBy({ by: ["productId"], _sum: { quantity: true } }),
   ]);
-  const stockInOf = new Map(stockInSums.map((s) => [s.productId, s._sum.quantity ?? 0]));
   const soldOf = new Map(saleSums.map((s) => [s.productId, s._sum.quantity ?? 0]));
 
+  const movementByProduct = new Map<string, { purchase: number; transferOut: number; adjustment: number }>();
+  for (const m of movementSums) {
+    const cur = movementByProduct.get(m.productId) ?? { purchase: 0, transferOut: 0, adjustment: 0 };
+    const qty = m._sum.quantity ?? 0;
+    if (m.type === "PURCHASE") cur.purchase += qty;
+    else if (m.type === "TRANSFER_OUT") cur.transferOut += qty;
+    else cur.adjustment += qty;
+    movementByProduct.set(m.productId, cur);
+  }
+
   return products.map((p) => {
-    const totalStockIn = stockInOf.get(p.id) ?? 0;
+    const mv = movementByProduct.get(p.id) ?? { purchase: 0, transferOut: 0, adjustment: 0 };
     const totalSold = soldOf.get(p.id) ?? 0;
     return {
       id: p.id,
       name: p.name,
       category: p.category,
       active: p.active,
-      totalStockIn,
+      totalPurchased: mv.purchase,
+      totalTransferredOut: mv.transferOut,
+      totalAdjustment: mv.adjustment,
       totalSold,
-      currentStock: totalStockIn - totalSold,
+      currentStock: mv.purchase + mv.transferOut + mv.adjustment - totalSold,
     };
   });
 }
 
-/** 仕入れ履歴(新しい順)。編集フォームの初期値に必要なフィールドも含む。 */
+/** 1商品の現在庫(棚卸調整の差分計算に使う)。 */
+export async function getCurrentStock(productId: string): Promise<number> {
+  const [movementSum, saleSum] = await Promise.all([
+    prisma.productStockIn.aggregate({ where: { productId }, _sum: { quantity: true } }),
+    prisma.productSale.aggregate({ where: { productId }, _sum: { quantity: true } }),
+  ]);
+  return (movementSum._sum.quantity ?? 0) - (saleSum._sum.quantity ?? 0);
+}
+
+/** 入出庫履歴(新しい順)。編集フォームの初期値に必要なフィールドも含む。 */
 export async function getStockInHistory() {
   const rows = await prisma.productStockIn.findMany({
     orderBy: { stockInDate: "desc" },
@@ -297,7 +319,9 @@ export async function getStockInHistory() {
     id: r.id,
     productId: r.productId,
     productName: r.product.name,
+    type: r.type,
     quantity: r.quantity,
+    destination: r.destination,
     stockInDate: r.stockInDate,
     staffId: r.staffId,
     staffName: r.staff?.name ?? null,

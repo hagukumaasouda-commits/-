@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getInventoryStatus, getStockInHistory } from "@/lib/product-reports";
-import { recordStockIn } from "@/app/actions/products";
+import { recordStockMovement } from "@/app/actions/products";
 import { PRODUCT_CATEGORY_LABEL } from "@/lib/tags";
 import { StockInRow } from "./stock-in-row";
 
@@ -27,7 +27,7 @@ export default async function InventoryPage() {
         </p>
       </div>
 
-      <section className="rounded-lg border border-stone-200 bg-white p-5">
+      <section className="rounded-lg border border-stone-200 bg-white p-5 overflow-x-auto">
         <h2 className="font-semibold mb-3">現在の在庫</h2>
         <table className="w-full text-sm">
           <thead>
@@ -35,6 +35,8 @@ export default async function InventoryPage() {
               <th className="py-1.5 font-normal">商品</th>
               <th className="py-1.5 font-normal">カテゴリ</th>
               <th className="py-1.5 font-normal text-right">仕入れ累計</th>
+              <th className="py-1.5 font-normal text-right">他店舗移動累計</th>
+              <th className="py-1.5 font-normal text-right">調整累計</th>
               <th className="py-1.5 font-normal text-right">販売累計</th>
               <th className="py-1.5 font-normal text-right">現在庫</th>
             </tr>
@@ -47,7 +49,9 @@ export default async function InventoryPage() {
                   {!p.active && <span className="ml-2 text-xs text-stone-400">(取り扱い終了)</span>}
                 </td>
                 <td className="py-1.5 text-stone-500 text-xs">{PRODUCT_CATEGORY_LABEL[p.category]}</td>
-                <td className="py-1.5 text-right tabular-nums">{p.totalStockIn}</td>
+                <td className="py-1.5 text-right tabular-nums">{p.totalPurchased}</td>
+                <td className="py-1.5 text-right tabular-nums">{p.totalTransferredOut}</td>
+                <td className="py-1.5 text-right tabular-nums">{p.totalAdjustment}</td>
                 <td className="py-1.5 text-right tabular-nums">{p.totalSold}</td>
                 <td className={`py-1.5 text-right tabular-nums font-medium ${p.currentStock <= 0 ? "text-rose-700" : "text-stone-900"}`}>
                   {p.currentStock}
@@ -56,7 +60,7 @@ export default async function InventoryPage() {
             ))}
             {inventory.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-4 text-center text-stone-400">
+                <td colSpan={7} className="py-4 text-center text-stone-400">
                   商品が登録されていません
                 </td>
               </tr>
@@ -66,9 +70,9 @@ export default async function InventoryPage() {
       </section>
 
       <section className="rounded-lg border border-stone-200 bg-white p-5">
-        <h2 className="font-semibold mb-3">仕入れを記録する</h2>
-        <form action={recordStockIn} className="flex flex-wrap items-end gap-2">
-          <select name="productId" required className="input py-1.5 text-sm">
+        <h2 className="font-semibold mb-3">入出庫を記録する</h2>
+        <form action={recordStockMovement} className="flex flex-col gap-3">
+          <select name="productId" required className="input py-1.5 text-sm w-fit">
             <option value="">商品を選択</option>
             {activeProducts.map((p) => (
               <option key={p.id} value={p.id}>
@@ -76,31 +80,67 @@ export default async function InventoryPage() {
               </option>
             ))}
           </select>
-          <input type="number" name="quantity" min={1} step={1} required placeholder="数量" className="input py-1.5 text-sm w-24" />
-          <input type="date" name="stockInDate" defaultValue={new Date().toISOString().slice(0, 10)} className="input py-1.5 text-sm" />
-          <select name="staffId" className="input py-1.5 text-sm">
-            <option value="">担当スタッフ</option>
-            {staff.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <input name="note" placeholder="メモ(仕入れ先など、任意)" className="input py-1.5 text-sm" />
-          <button type="submit" className="rounded-md bg-emerald-800 px-3 py-1.5 text-sm font-medium text-white">
-            記録する
-          </button>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-stone-200 bg-stone-50 p-3">
+            <input type="radio" id="mtPurchase" name="movementType" value="PURCHASE" defaultChecked className="peer/purchase accent-emerald-800" />
+            <label htmlFor="mtPurchase">仕入れ</label>
+            <input type="radio" id="mtTransfer" name="movementType" value="TRANSFER_OUT" className="peer/transfer accent-emerald-800" />
+            <label htmlFor="mtTransfer">他店舗へ移動</label>
+            <input type="radio" id="mtAdjust" name="movementType" value="ADJUSTMENT" className="peer/adjust accent-emerald-800" />
+            <label htmlFor="mtAdjust">棚卸調整</label>
+
+            <input
+              type="number"
+              name="quantity"
+              min={1}
+              step={1}
+              placeholder="数量"
+              className="input hidden w-28 peer-checked/purchase:block peer-checked/transfer:block"
+            />
+            <input
+              type="text"
+              name="destination"
+              placeholder="移動先(砥部院 など)"
+              className="input hidden w-48 peer-checked/transfer:block"
+            />
+            <input
+              type="number"
+              name="currentStockInput"
+              min={0}
+              step={1}
+              placeholder="現在の実在庫数"
+              className="input hidden w-36 peer-checked/adjust:block"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-end gap-2">
+            <input type="date" name="stockInDate" defaultValue={new Date().toISOString().slice(0, 10)} className="input py-1.5 text-sm" />
+            <select name="staffId" className="input py-1.5 text-sm">
+              <option value="">担当スタッフ</option>
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <input name="note" placeholder="メモ(仕入れ先など、任意)" className="input py-1.5 text-sm" />
+            <button type="submit" className="rounded-md bg-emerald-800 px-3 py-1.5 text-sm font-medium text-white">
+              記録する
+            </button>
+          </div>
         </form>
       </section>
 
       <section className="rounded-lg border border-stone-200 bg-white p-5">
-        <h2 className="font-semibold mb-3">仕入れ履歴({stockInHistory.length}件)</h2>
+        <h2 className="font-semibold mb-3">入出庫履歴({stockInHistory.length}件)</h2>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-stone-500 border-b border-stone-200">
               <th className="py-1.5 font-normal">日付</th>
               <th className="py-1.5 font-normal">商品</th>
+              <th className="py-1.5 font-normal">種別</th>
               <th className="py-1.5 font-normal text-right">数量</th>
+              <th className="py-1.5 font-normal">移動先</th>
               <th className="py-1.5 font-normal">担当</th>
               <th className="py-1.5 font-normal">メモ</th>
               <th className="py-1.5 font-normal text-right">操作</th>
@@ -112,8 +152,8 @@ export default async function InventoryPage() {
             ))}
             {stockInHistory.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-4 text-center text-stone-400">
-                  仕入れ記録はまだありません
+                <td colSpan={8} className="py-4 text-center text-stone-400">
+                  入出庫記録はまだありません
                 </td>
               </tr>
             )}

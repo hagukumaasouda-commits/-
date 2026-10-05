@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { CheckType } from "@/app/generated/prisma/client";
 import { resolveAwarenessCheck, submitDialogue } from "@/app/actions/awareness";
 import { AwarenessCheckButton } from "./awareness-check-button";
-import { confirmDeparture, recordFollowupContact } from "@/app/actions/departures";
+import { confirmDeparture, recordFollowupContact, updateDepartureRecord } from "@/app/actions/departures";
 import { requestReassignment, resolveReassignment } from "@/app/actions/reassignments";
 import { recordPrepaidTransaction } from "@/app/actions/prepaid";
 import { recordProductSale } from "@/app/actions/products";
@@ -506,6 +506,28 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                   <span className="ml-2 text-xs text-stone-400">記録: {d.confirmedBy.name}</span>
                 </p>
                 {d.reasonNote && <p className="mt-1 text-xs text-stone-600">{d.reasonNote}</p>}
+
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs text-emerald-800 underline">理由を修正する</summary>
+                  <form action={updateDepartureRecord.bind(null, d.id)} className="mt-2 flex flex-col gap-2">
+                    <Field label="離脱理由">
+                      <select name="reason" className="input" defaultValue={d.reason ?? ""}>
+                        <option value="">未選択</option>
+                        {Object.entries(departureReasonLabel).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="補足メモ">
+                      <textarea name="reasonNote" rows={2} className="input" defaultValue={d.reasonNote ?? ""} />
+                    </Field>
+                    <button type="submit" className="rounded-md bg-stone-800 px-3 py-1.5 text-xs font-medium text-white w-fit">
+                      修正を保存する
+                    </button>
+                  </form>
+                </details>
 
                 <ul className="mt-2 flex flex-col divide-y divide-stone-100 border-t border-stone-100">
                   {d.checkpoints.map((cp) => (

@@ -551,20 +551,28 @@ model ProductSale {
   @@index([staffId])
 }
 
-// 仕入れ記録(在庫管理)。現在庫 = 仕入れ数量の合計 - 販売数量の合計(手入力で運用)。
+// 入出庫記録(在庫管理)。現在庫 = 入出庫数量(符号付き)の合計 - 販売数量の合計(手入力で運用)。
 // ProductSale.quantityが無い行(CSV取り込み分の一部)は在庫計算に反映されない制約がある。
 model ProductStockIn {
-  id          String   @id @default(cuid())
+  id          String                   @id @default(cuid())
   productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  quantity    Int
+  product     Product                  @relation(fields: [productId], references: [id])
+  type        ProductStockMovementType @default(PURCHASE)
+  quantity    Int // 符号付き。仕入れ=正、他店舗への移動=負、棚卸調整=記録時点の実在庫数との差分(正負どちらも)
+  destination String? // 移動先(例:砥部院)。type=TRANSFER_OUTの場合のみ使用
   stockInDate DateTime
   staffId     String?
-  staff       Staff?   @relation(fields: [staffId], references: [id])
+  staff       Staff?                   @relation(fields: [staffId], references: [id])
   note        String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime                 @default(now())
 
   @@index([productId, stockInDate])
+}
+
+enum ProductStockMovementType {
+  PURCHASE // 仕入れ
+  TRANSFER_OUT // 他店舗へ移動(砥部院など)
+  ADJUSTMENT // 棚卸調整(実在庫数の入力による補正)
 }
 
 // ---------------------------------------------------------------------------

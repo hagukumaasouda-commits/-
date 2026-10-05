@@ -49,6 +49,21 @@ export async function confirmDeparture(clientId: string, formData: FormData) {
   revalidatePath("/followups");
 }
 
+/** 離脱理由・補足メモの入力ミスを修正する(離脱の確認日・チェックポイントには影響しない)。 */
+export async function updateDepartureRecord(departureRecordId: string, formData: FormData) {
+  const reasonRaw = String(formData.get("reason") || "");
+  const reason = reasonRaw ? (reasonRaw as DepartureReason) : null;
+  const reasonNote = String(formData.get("reasonNote") || "") || null;
+
+  const record = await prisma.departureRecord.update({
+    where: { id: departureRecordId },
+    data: { reason, reasonNote },
+    select: { clientId: true },
+  });
+
+  revalidatePath(`/clients/${record.clientId}`);
+}
+
 /** フォローアップチェックポイントへの対応(連絡方法・反応)を記録する。 */
 export async function recordFollowupContact(checkpointId: string, formData: FormData) {
   const session = await auth();
