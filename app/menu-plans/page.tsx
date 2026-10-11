@@ -1,0 +1,129 @@
+import Link from "next/link";
+import { granularityToPeriod } from "@/lib/reports";
+import { getMonthlyMenuPlanCounts, getStaffMenuPlanCounts } from "@/lib/menu-plan-reports";
+import { MENU_PLAN_OPTIONS } from "@/lib/tags";
+
+function fmtDate(d: Date) {
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function shiftReference(ref: Date, granularity: "week" | "month", dir: -1 | 1) {
+  const d = new Date(ref);
+  if (granularity === "week") d.setDate(d.getDate() + dir * 7);
+  else d.setMonth(d.getMonth() + dir);
+  return d.toISOString().slice(0, 10);
+}
+
+export default async function MenuPlansPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ granularity?: string; ref?: string }>;
+}) {
+  const sp = await searchParams;
+  const granularity: "week" | "month" = sp.granularity === "week" ? "week" : "month";
+  const reference = sp.ref ? new Date(sp.ref) : new Date();
+  const period = granularityToPeriod(granularity, reference);
+
+  const [counts, staffCounts] = await Promise.all([getMonthlyMenuPlanCounts(period), getStaffMenuPlanCounts(period)]);
+  const totalCount = counts.reduce((s, c) => s + c.count, 0);
+
+  const prevHref = `/menu-plans?granularity=${granularity}&ref=${shiftReference(reference, granularity, -1)}`;
+  const nextHref = `/menu-plans?granularity=${granularity}&ref=${shiftReference(reference, granularity, 1)}`;
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-stone-900">メニュー集計</h1>
+          <p className="text-sm text-stone-500 mt-1">
+            {fmtDate(period.start)} 〜 {fmtDate(period.end)}(来院記録の本日のメニューを来院日ベースで集計)
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <div className="flex rounded-md border border-stone-300 overflow-hidden">
+            <Link
+              href={`/menu-plans?granularity=week`}
+              className={`px-3 py-1.5 ${granularity === "week" ? "bg-emerald-800 text-white" : "bg-white text-stone-600"}`}
+            >
+              週次
+            </Link>
+            <Link
+              href={`/menu-plans?granularity=month`}
+              className={`px-3 py-1.5 ${granularity === "month" ? "bg-emerald-800 text-white" : "bg-white text-stone-600"}`}
+            >
+              月次
+            </Link>
+          </div>
+          <Link href={prevHref} className="rounded-md border border-stone-300 bg-white px-3 py-1.5 hover:bg-stone-100">
+            ← 前
+          </Link>
+          <Link href={nextHref} className="rounded-md border border-stone-300 bg-white px-3 py-1.5 hover:bg-stone-100">
+            次 →
+          </Link>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-stone-200 bg-white p-4 sm:w-64">
+        <div className="text-xs text-stone-500">メニュー選択件数合計</div>
+        <div className="mt-1 text-2xl font-semibold tabular-nums text-stone-900">{totalCount}件</div>
+      </div>
+
+      <section className="rounded-lg border border-stone-200 bg-white p-5 lg:w-96">
+        <h2 className="font-semibold mb-3">項目別件数</h2>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-stone-500 border-b border-stone-200">
+              <th className="py-1.5 font-normal">メニュー</th>
+              <th className="py-1.5 font-normal text-right">件数</th>
+            </tr>
+          </thead>
+          <tbody>
+            {counts.map((c) => (
+              <tr key={c.value} className="border-b border-stone-100 last:border-0">
+                <td className="py-1.5">{c.label}</td>
+                <td className="py-1.5 text-right tabular-nums">{c.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="rounded-lg border border-stone-200 bg-white p-5 overflow-x-auto">
+        <h2 className="font-semibold mb-3">スタッフ別件数</h2>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-stone-500 border-b border-stone-200">
+              <th className="py-1.5 font-normal">スタッフ</th>
+              {MENU_PLAN_OPTIONS.map((o) => (
+                <th key={o.value} className="py-1.5 font-normal text-right whitespace-nowrap">
+                  {o.label}
+                </th>
+              ))}
+              <th className="py-1.5 font-normal text-right">合計</th>
+            </tr>
+          </thead>
+          <tbody>
+            {staffCounts.length === 0 && (
+              <tr>
+                <td colSpan={MENU_PLAN_OPTIONS.length + 2} className="py-2 text-stone-400">
+                  この期間のメニュー記録はありません
+                </td>
+              </tr>
+            )}
+            {staffCounts.map((s) => (
+              <tr key={s.staffId} className="border-b border-stone-100 last:border-0">
+                <td className="py-1.5 whitespace-nowrap">{s.staffName}</td>
+                {MENU_PLAN_OPTIONS.map((o) => (
+                  <td key={o.value} className="py-1.5 text-right tabular-nums">
+                    {s.counts[o.value] ?? 0}
+                  </td>
+                ))}
+                <td className="py-1.5 text-right tabular-nums font-medium">{s.total}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  );
+}

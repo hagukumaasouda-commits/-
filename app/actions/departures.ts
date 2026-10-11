@@ -27,7 +27,8 @@ export async function confirmDeparture(clientId: string, formData: FormData) {
   const reasonNote = String(formData.get("reasonNote") || "") || null;
   const triggeredByCancellation = formData.get("triggeredByCancellation") === "true";
 
-  const confirmedAt = new Date();
+  const confirmedAtRaw = String(formData.get("confirmedAt") || "");
+  const confirmedAt = confirmedAtRaw ? new Date(confirmedAtRaw) : new Date();
 
   await prisma.$transaction(async (tx) => {
     const departure = await tx.departureRecord.create({
@@ -49,19 +50,42 @@ export async function confirmDeparture(clientId: string, formData: FormData) {
   revalidatePath("/followups");
 }
 
-/** 離脱理由・補足メモの入力ミスを修正する(離脱の確認日・チェックポイントには影響しない)。 */
+/**
+ * 離脱理由・補足メモ・離脱日の入力ミスを修正する。離脱日(confirmedAt)を変更した場合、
+ * フォローアップチェックポイントの予定日もその新しい離脱日を起点に再計算する
+ * (過去データの入力時に当月扱いになってしまう問題への対応)。対応済み(CONTACTED)の
+ * チェックポイントも予定日自体は再計算するが、対応記録(contactedAt等)はそのまま残す。
+ */
 export async function updateDepartureRecord(departureRecordId: string, formData: FormData) {
   const reasonRaw = String(formData.get("reason") || "");
   const reason = reasonRaw ? (reasonRaw as DepartureReason) : null;
   const reasonNote = String(formData.get("reasonNote") || "") || null;
+  const confirmedAtRaw = String(formData.get("confirmedAt") || "");
 
-  const record = await prisma.departureRecord.update({
-    where: { id: departureRecordId },
-    data: { reason, reasonNote },
-    select: { clientId: true },
+  const clientId = await prisma.$transaction(async (tx) => {
+    const data: { reason: DepartureReason | null; reasonNote: string | null; confirmedAt?: Date } = { reason, reasonNote };
+    if (confirmedAtRaw) data.confirmedAt = new Date(confirmedAtRaw);
+
+    const record = await tx.departureRecord.update({
+      where: { id: departureRecordId },
+      data,
+      select: { clientId: true, confirmedAt: true },
+    });
+
+    if (confirmedAtRaw) {
+      for (const stage of Object.keys(CHECKPOINT_OFFSET_DAYS) as CheckpointStage[]) {
+        await tx.followupCheckpoint.updateMany({
+          where: { departureRecordId, stage },
+          data: { scheduledDate: new Date(record.confirmedAt.getTime() + CHECKPOINT_OFFSET_DAYS[stage] * DAY_MS) },
+        });
+      }
+    }
+
+    return record.clientId;
   });
 
-  revalidatePath(`/clients/${record.clientId}`);
+  revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/followups");
 }
 
 /** フォローアップチェックポイントへの対応(連絡方法・反応)を記録する。 */

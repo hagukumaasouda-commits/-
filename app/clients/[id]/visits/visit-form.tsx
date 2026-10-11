@@ -19,6 +19,7 @@ export type VisitFormDefaults = {
   menuPlan?: string;
   chiefComplaintTags?: string[];
   treatmentModalities?: string[];
+  treatmentModalitiesNew?: string[];
   menuOverride?: string;
   bodyPartTags?: string[];
   lifestyleSupportStatus?: string[];
@@ -98,6 +99,7 @@ export function VisitForm({
             defaultMenuPlan={defaults.menuPlan ?? ""}
             defaultTags={defaults.chiefComplaintTags ?? []}
             defaultModalities={defaults.treatmentModalities ?? []}
+            defaultModalitiesNew={defaults.treatmentModalitiesNew ?? []}
             defaultOverride={defaults.menuOverride ?? ""}
           />
         </Field>

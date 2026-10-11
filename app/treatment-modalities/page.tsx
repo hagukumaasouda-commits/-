@@ -29,6 +29,7 @@ export default async function TreatmentModalitiesPage({
     getStaffTreatmentModalityCounts(period),
   ]);
   const totalCount = counts.reduce((s, c) => s + c.count, 0);
+  const totalNewCount = counts.reduce((s, c) => s + c.newCount, 0);
 
   const prevHref = `/treatment-modalities?granularity=${granularity}&ref=${shiftReference(reference, granularity, -1)}`;
   const nextHref = `/treatment-modalities?granularity=${granularity}&ref=${shiftReference(reference, granularity, 1)}`;
@@ -66,9 +67,15 @@ export default async function TreatmentModalitiesPage({
         </div>
       </div>
 
-      <div className="rounded-lg border border-stone-200 bg-white p-4 sm:w-64">
-        <div className="text-xs text-stone-500">物療実施件数合計</div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums text-stone-900">{totalCount}件</div>
+      <div className="flex flex-wrap gap-4">
+        <div className="rounded-lg border border-stone-200 bg-white p-4 sm:w-64">
+          <div className="text-xs text-stone-500">物療実施件数合計</div>
+          <div className="mt-1 text-2xl font-semibold tabular-nums text-stone-900">{totalCount}件</div>
+        </div>
+        <div className="rounded-lg border border-stone-200 bg-white p-4 sm:w-64">
+          <div className="text-xs text-stone-500">うち新規件数合計</div>
+          <div className="mt-1 text-2xl font-semibold tabular-nums text-amber-700">{totalNewCount}件</div>
+        </div>
       </div>
 
       <section className="rounded-lg border border-stone-200 bg-white p-5 lg:w-96">
@@ -78,6 +85,7 @@ export default async function TreatmentModalitiesPage({
             <tr className="text-left text-stone-500 border-b border-stone-200">
               <th className="py-1.5 font-normal">項目</th>
               <th className="py-1.5 font-normal text-right">件数</th>
+              <th className="py-1.5 font-normal text-right">新規</th>
             </tr>
           </thead>
           <tbody>
@@ -85,6 +93,7 @@ export default async function TreatmentModalitiesPage({
               <tr key={c.item} className="border-b border-stone-100 last:border-0">
                 <td className="py-1.5">{c.item}</td>
                 <td className="py-1.5 text-right tabular-nums">{c.count}</td>
+                <td className="py-1.5 text-right tabular-nums text-amber-700">{c.newCount}</td>
               </tr>
             ))}
           </tbody>

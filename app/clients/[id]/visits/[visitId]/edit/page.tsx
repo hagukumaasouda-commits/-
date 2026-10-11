@@ -28,6 +28,7 @@ export default async function EditVisitPage({ params }: { params: Promise<{ id: 
   const isLatestVisit = latestVisit?.id === visit.id;
 
   const treatmentModalities = chartRecord?.treatmentModalities as Record<string, boolean> | null;
+  const treatmentModalitiesNew = chartRecord?.treatmentModalitiesNew as Record<string, boolean> | null;
   const lifestyleSupportStatus = chartRecord?.lifestyleSupportStatus as Record<string, boolean> | null;
   const standingExamJson = (chartRecord?.standingExam ?? null) as Record<string, unknown> | null;
   const sittingExamJson = (chartRecord?.sittingExam ?? null) as Record<string, unknown> | null;
@@ -77,6 +78,9 @@ export default async function EditVisitPage({ params }: { params: Promise<{ id: 
     chiefComplaintTags: chartRecord?.chiefComplaintTags ?? [],
     treatmentModalities: treatmentModalities
       ? Object.entries(treatmentModalities).filter(([, done]) => done).map(([item]) => item)
+      : [],
+    treatmentModalitiesNew: treatmentModalitiesNew
+      ? Object.entries(treatmentModalitiesNew).filter(([, isNew]) => isNew).map(([item]) => item)
       : [],
     menuOverride: visit.menu ?? "",
     bodyPartTags: chartRecord?.bodyPartTags ?? [],

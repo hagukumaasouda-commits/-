@@ -50,6 +50,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/treatment-modalities" className="hover:text-emerald-800">
                     物療集計
                   </Link>
+                  <Link href="/menu-plans" className="hover:text-emerald-800">
+                    メニュー集計
+                  </Link>
                 </nav>
                 <div className="ml-auto flex items-center gap-3 text-sm text-stone-500">
                   <span>{session.user.name} さん</span>

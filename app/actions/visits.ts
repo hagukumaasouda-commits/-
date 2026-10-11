@@ -98,6 +98,10 @@ export async function createVisit(clientId: string, formData: FormData) {
   const treatmentModalities = Object.fromEntries(
     TREATMENT_MODALITY_ITEMS.map((item) => [item, checkedModalities.has(item)])
   );
+  const newModalities = new Set(formData.getAll("treatmentModalitiesNew").map(String));
+  const treatmentModalitiesNew = Object.fromEntries(
+    TREATMENT_MODALITY_ITEMS.map((item) => [item, checkedModalities.has(item) && newModalities.has(item)])
+  );
 
   const isManualReturnFlag = formData.get("isManualReturnFlag") === "true";
   const { standingExam, sittingExam, supineExam } = parseBasicExam(formData);
@@ -140,6 +144,7 @@ export async function createVisit(clientId: string, formData: FormData) {
       referralCount,
       menuPlan,
       treatmentModalities,
+      treatmentModalitiesNew,
       isManualReturnFlag,
     },
   });
@@ -218,6 +223,10 @@ export async function updateVisit(visitId: string, formData: FormData) {
   const treatmentModalities = Object.fromEntries(
     TREATMENT_MODALITY_ITEMS.map((item) => [item, checkedModalities.has(item)])
   );
+  const newModalities = new Set(formData.getAll("treatmentModalitiesNew").map(String));
+  const treatmentModalitiesNew = Object.fromEntries(
+    TREATMENT_MODALITY_ITEMS.map((item) => [item, checkedModalities.has(item) && newModalities.has(item)])
+  );
 
   const isManualReturnFlag = formData.get("isManualReturnFlag") === "true";
   const { standingExam, sittingExam, supineExam } = parseBasicExam(formData);
@@ -252,6 +261,7 @@ export async function updateVisit(visitId: string, formData: FormData) {
       referralCount,
       menuPlan,
       treatmentModalities,
+      treatmentModalitiesNew,
       isManualReturnFlag,
     },
   });

@@ -254,8 +254,9 @@ model ChartRecord {
   referralGiven           Boolean   @default(false) // 紹介をしてくれたか
   referralCount           Int? // 紹介人数(任意。未入力時はreferralGiven=trueなら1として扱う)
 
-  menuPlan            MenuPlan? // 本日のメニュー(プラン)。lib/tags.ts の TREATMENT_MENU と対応
-  treatmentModalities Json? // 物療チェック(コアレ10/コアレ20/ブースター/セラゼム/鍼/灸の済/未マップ。生活習慣サポートとは別概念)
+  menuPlan               MenuPlan? // 本日のメニュー(プラン)。lib/tags.ts の TREATMENT_MENU と対応
+  treatmentModalities    Json? // 物療チェック(コアレ10/コアレ20/ブースター/セラゼム/鍼/灸の済/未マップ。生活習慣サポートとは別概念)
+  treatmentModalitiesNew Json? // 物療チェックのうち、その項目を今回初めて実施した(新規)かのマップ。チェック済み項目のみ意味を持つ
 
   isManualReturnFlag Boolean @default(false) // この来院が離脱からの復帰(再診)であることを示す手動フラグ(docs/referral-source-registration-type-spec-v2.md 再診数2.4)
 

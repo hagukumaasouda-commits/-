@@ -418,6 +418,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <details className="flex-1 min-w-[280px]">
               <summary className="cursor-pointer text-sm font-medium text-stone-700">離脱を記録する</summary>
               <form action={confirmDeparture.bind(null, client.id)} className="mt-3 flex flex-col gap-3">
+                <Field label="離脱日">
+                  <input type="date" name="confirmedAt" defaultValue={new Date().toISOString().slice(0, 10)} className="input" />
+                </Field>
                 <Field label="離脱理由" required>
                   <select name="reason" required className="input">
                     <option value="">選択してください</option>
@@ -510,6 +513,14 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 <details className="mt-2">
                   <summary className="cursor-pointer text-xs text-emerald-800 underline">理由を修正する</summary>
                   <form action={updateDepartureRecord.bind(null, d.id)} className="mt-2 flex flex-col gap-2">
+                    <Field label="離脱日">
+                      <input
+                        type="date"
+                        name="confirmedAt"
+                        defaultValue={d.confirmedAt.toISOString().slice(0, 10)}
+                        className="input"
+                      />
+                    </Field>
                     <Field label="離脱理由">
                       <select name="reason" className="input" defaultValue={d.reason ?? ""}>
                         <option value="">未選択</option>

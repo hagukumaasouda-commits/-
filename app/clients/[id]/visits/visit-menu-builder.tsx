@@ -14,6 +14,7 @@ export function VisitMenuBuilder({
   defaultMenuPlan = "",
   defaultTags = [],
   defaultModalities = [],
+  defaultModalitiesNew = [],
   defaultOverride = "",
 }: {
   menuPlanOptions: { value: MenuPlan; label: string }[];
@@ -22,11 +23,13 @@ export function VisitMenuBuilder({
   defaultMenuPlan?: string;
   defaultTags?: string[];
   defaultModalities?: string[];
+  defaultModalitiesNew?: string[];
   defaultOverride?: string;
 }) {
   const [menuPlan, setMenuPlan] = useState(defaultMenuPlan);
   const [tags, setTags] = useState<string[]>(defaultTags);
   const [modalities, setModalities] = useState<string[]>(defaultModalities);
+  const [modalitiesNew, setModalitiesNew] = useState<string[]>(defaultModalitiesNew);
   const [override, setOverride] = useState(defaultOverride);
 
   const planLabel = menuPlanOptions.find((o) => o.value === menuPlan)?.label ?? "";
@@ -68,21 +71,41 @@ export function VisitMenuBuilder({
       </div>
 
       <div className="flex flex-col gap-1 text-sm">
-        <span className="text-stone-600">物療チェック</span>
+        <span className="text-stone-600">物療チェック(「新規」はその項目を今回初めて実施した場合にチェック)</span>
         <div className="flex flex-wrap gap-x-4 gap-y-2 rounded-md border border-stone-200 bg-white p-3">
-          {treatmentModalityItems.map((opt) => (
-            <label key={opt} className="flex items-center gap-1.5 text-sm text-stone-700">
-              <input
-                type="checkbox"
-                name="treatmentModalities"
-                value={opt}
-                checked={modalities.includes(opt)}
-                onChange={() => setModalities(toggle(modalities, opt))}
-                className="accent-emerald-800"
-              />
-              {opt}
-            </label>
-          ))}
+          {treatmentModalityItems.map((opt) => {
+            const checked = modalities.includes(opt);
+            return (
+              <span key={opt} className="flex items-center gap-2 text-sm text-stone-700">
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    name="treatmentModalities"
+                    value={opt}
+                    checked={checked}
+                    onChange={() => {
+                      setModalities(toggle(modalities, opt));
+                      if (checked) setModalitiesNew(modalitiesNew.filter((v) => v !== opt));
+                    }}
+                    className="accent-emerald-800"
+                  />
+                  {opt}
+                </label>
+                <label className={`flex items-center gap-1 text-xs ${checked ? "text-amber-700" : "text-stone-300"}`}>
+                  <input
+                    type="checkbox"
+                    name="treatmentModalitiesNew"
+                    value={opt}
+                    checked={modalitiesNew.includes(opt)}
+                    disabled={!checked}
+                    onChange={() => setModalitiesNew(toggle(modalitiesNew, opt))}
+                    className="accent-amber-700"
+                  />
+                  新規
+                </label>
+              </span>
+            );
+          })}
         </div>
       </div>
 
