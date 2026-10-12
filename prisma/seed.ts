@@ -62,6 +62,9 @@ async function main() {
     "ホームページ",
     "インスタグラム・SNS",
     "ご紹介",
+    "自宅や職場の近く",
+    "神経整体のSNS・動画",
+    "チラシ",
     "その他",
   ];
   const channels = Object.fromEntries(

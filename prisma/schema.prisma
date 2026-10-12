@@ -41,6 +41,7 @@ model Staff {
   reassignmentsAsNewStaff ReassignmentRequest[] @relation("ReassignmentNewStaff")
   lineFriendsLinked       LineFriend[]          @relation("LineFriendLinkedBy")
   clientPhotosUploaded    ClientPhoto[]
+  intakeResponsesLinked   IntakeResponse[]      @relation("IntakeResponseLinkedBy")
 }
 
 enum StaffRole {
@@ -121,6 +122,7 @@ model Client {
   reassignmentRequests ReassignmentRequest[]
   lineFriend           LineFriend?
   photos               ClientPhoto[]
+  intakeResponse       IntakeResponse?
 
   @@index([acquisitionChannelId])
   @@index([primaryStaffId])
@@ -406,6 +408,31 @@ model LineFriend {
   linkedByStaffId String?
   linkedByStaff   Staff?    @relation("LineFriendLinkedBy", fields: [linkedByStaffId], references: [id])
 
+  @@index([linkedClientId])
+}
+
+// LINE LIFFの事前問診フォーム(docs/line-intake-form-spec-v2.md)。来院前にLINEから送信された問診回答を
+// そのまま保持し、新規顧客登録時またはスタッフの手動操作でClientに紐づける。回答内容は質問項目が多いため
+// answers(Json)に一括格納し、lib/intake-questions.tsを唯一の情報源として入力フォーム・表示の両方で使う。
+model IntakeResponse {
+  id          String   @id @default(cuid())
+  lineUserId  String? // LIFFのIDトークン検証で取得。LIFF外から来た場合はnull
+  submittedAt DateTime @default(now())
+
+  // 一覧表示・突合用に複製して持つ(本体はanswersに入っている)
+  name  String
+  kana  String?
+  phone String?
+
+  answers Json // lib/intake-questions.ts の質問keyごとの回答(文字列 or 文字列配列)
+
+  linkedClientId  String?   @unique
+  linkedClient    Client?   @relation(fields: [linkedClientId], references: [id])
+  linkedAt        DateTime?
+  linkedByStaffId String?
+  linkedByStaff   Staff?    @relation("IntakeResponseLinkedBy", fields: [linkedByStaffId], references: [id])
+
+  @@index([lineUserId])
   @@index([linkedClientId])
 }
 

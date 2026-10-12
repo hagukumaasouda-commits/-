@@ -67,6 +67,9 @@ export async function createClient(formData: FormData) {
       kana: String(formData.get("kana") || "") || null,
       gender: String(formData.get("gender") || "") || null,
       phone: String(formData.get("phone") || "") || null,
+      postalCode: String(formData.get("postalCode") || "") || null,
+      address: String(formData.get("address") || "") || null,
+      occupation: String(formData.get("occupation") || "") || null,
       acquisitionChannelId,
       primaryStaffId,
       firstVisitDate: firstVisitDateRaw ? new Date(firstVisitDateRaw) : null,
@@ -91,6 +94,14 @@ export async function createClient(formData: FormData) {
 
   if (referralSourceClientId) {
     await prisma.client.update({ where: { id: referralSourceClientId }, data: { referralCount: { increment: 1 } } });
+  }
+
+  const intakeResponseId = String(formData.get("intakeResponseId") || "") || null;
+  if (intakeResponseId) {
+    await prisma.intakeResponse.updateMany({
+      where: { id: intakeResponseId, linkedClientId: null },
+      data: { linkedClientId: client.id, linkedAt: new Date() },
+    });
   }
 
   redirect(`/clients/${client.id}`);

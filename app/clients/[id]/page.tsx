@@ -14,6 +14,7 @@ import { DeleteVisitButton } from "./visits/delete-visit-button";
 import { ProductSaleRow } from "@/app/products/product-sale-row";
 import { ClientPhotosSection } from "./client-photos-section";
 import { getClientPhotoSignedUrls } from "@/lib/supabase-storage";
+import { IntakeAnswersView } from "@/app/intake-responses/intake-answers-view";
 import {
   VISIT_INTERVAL_LABEL as visitIntervalLabel,
   HEALTH_HAPPINESS_LABEL as healthHappinessScoreLabel,
@@ -96,6 +97,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         orderBy: [{ category: "asc" }, { takenAt: "desc" }],
         include: { uploadedBy: { select: { name: true } } },
       },
+      intakeResponse: true,
     },
   });
   if (!client) notFound();
@@ -680,6 +682,21 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       </section>
 
       <ClientPhotosSection clientId={client.id} photos={photosWithUrl} />
+
+      {client.intakeResponse && (
+        <section className="rounded-lg border border-stone-200 bg-white p-5">
+          <h2 className="font-semibold mb-1">LINE事前問診の回答</h2>
+          <p className="text-xs text-stone-500 mb-3">
+            送信: {client.intakeResponse.submittedAt.toISOString().slice(0, 10)}
+          </p>
+          <details>
+            <summary className="cursor-pointer text-sm text-emerald-800 underline">回答内容を見る</summary>
+            <div className="mt-3">
+              <IntakeAnswersView answers={client.intakeResponse.answers as Record<string, string | string[]>} />
+            </div>
+          </details>
+        </section>
+      )}
 
       <section className="rounded-lg border border-stone-200 bg-white p-5">
         <h2 className="font-semibold mb-3">来院タイムライン</h2>

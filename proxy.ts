@@ -5,8 +5,9 @@ import { auth } from "@/auth";
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const isLoginPage = req.nextUrl.pathname === "/login";
+  const isIntakeForm = req.nextUrl.pathname === "/intake"; // 患者がLINEから未ログインで送信する公開ページ
 
-  if (!isLoggedIn && !isLoginPage) {
+  if (!isLoggedIn && !isLoginPage && !isIntakeForm) {
     const loginUrl = new URL("/login", req.nextUrl);
     loginUrl.searchParams.set("callbackUrl", req.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);

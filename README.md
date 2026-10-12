@@ -41,6 +41,8 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
    | `ANTHROPIC_API_KEY` | Anthropic APIキー |
    | `LINE_CHANNEL_ACCESS_TOKEN` | LINE公式アカウントのチャネルアクセストークン |
    | `LINE_CHANNEL_SECRET` | LINE Webhookの署名検証用チャネルシークレット(トークンとは別の値) |
+   | `NEXT_PUBLIC_LIFF_ID` | LINE事前問診フォーム(`/intake`)用のLIFF ID。下記「LINE事前問診」節のLIFFアプリ作成後に設定 |
+   | `LIFF_CHANNEL_ID` | 同上。チャネルID(数字のみ)。IDトークンのサーバー側検証に使用 |
    | `SUPABASE_URL` | 手順1-2で確認したSupabaseプロジェクトURL |
    | `SUPABASE_SERVICE_ROLE_KEY` | 手順1-2で確認した`service_role`キー(写真記録のStorageアクセス用) |
    | `APP_TZ` | `Asia/Tokyo`(来店日時のタイムゾーンを正しく扱うために必須。Vercelでは変数名 `TZ` が予約済みのため `APP_TZ` という名前で受け取り、`instrumentation.ts` が起動時に反映します) |
@@ -117,6 +119,8 @@ cp .env.example .env
 | `ANTHROPIC_MODEL` | AI気づきに使うモデルID(省略時 `claude-opus-5`) | 省略可 |
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINEリマインド送信・友だち一覧取得用 | 未設定だとリマインド送信・遡及登録が失敗します(理由をUIに表示) |
 | `LINE_CHANNEL_SECRET` | `/api/line/webhook` の署名検証用 | 未設定だとWebhookは全リクエストを401で拒否します |
+| `NEXT_PUBLIC_LIFF_ID` | LINE事前問診フォーム(`/intake`)のLIFF ID | 未設定でも`/intake`自体は開けますが、LINEとの自動突合ができず全件が未紐づけ扱いになります |
+| `LIFF_CHANNEL_ID` | LIFFのIDトークンをサーバー側で検証する際のチャネルID | 未設定だとIDトークン検証が失敗し、lineUserIdが取得できません(自動突合ができなくなる点は上記と同じ) |
 | `SUPABASE_URL` | 姿勢写真・インボディ結果の画像を保存するSupabase StorageのプロジェクトURL | 未設定だと写真の登録・表示・削除がすべて失敗します |
 | `SUPABASE_SERVICE_ROLE_KEY` | 同Storageへのアクセスキー(`anon`キーではなく`service_role`キー) | 同上 |
 
@@ -199,6 +203,22 @@ npm run dev
 - **LINE Developersコンソールで、Webhook URLを`https://<本番ドメイン>/api/line/webhook`に設定し、Webhookの利用を有効にしてください**。`LINE_CHANNEL_SECRET`(署名検証用、`LINE_CHANNEL_ACCESS_TOKEN`とは別の値)を環境変数に設定していないと、Webhookは全リクエストを401で拒否します。
 - **遡及登録の制限**: Webhook設置前から友だち追加済みだったユーザーは、`/line-friends`の「友だち一覧を取得」ボタン(`GET /v2/bot/followers/ids`)で遡って登録できますが、**LINEのiOS/Android版アプリのユーザーのみが対象**というLINE側の制限があり、LINEデスクトップ版のみ利用している友だちは一覧に載りません。この分は、Webhook側で「follow以外のイベント(メッセージ受信等)でもまだ記録が無ければ登録する」保険を入れてあるため、該当の友だちが何かメッセージを送ってくれば拾えます。それでも一切メッセージが来ない相手は、LINE公式アカウント管理画面がユーザーIDを表示しないため、システム的に拾う手段がありません(次回来店時にLINEで一言送ってもらう運用回避が必要です)。
 - **AI気づきに送信するデータ**: `lib/awareness/ai-insight.ts` は氏名・来院履歴・タグ・プリカ残高・予約状況をAnthropic APIに送信します。住所・電話番号・生年月日は送信していません。外部送信の可否は院内のポリシーに合わせて調整してください。
+
+## LINE事前問診(`/intake`)
+
+`docs/line-intake-form-spec-v2.md`参照。これまでGoogleフォームで運用していた事前問診票を、LINEから来院前に記入できるLIFF(LINE Front-end Framework)ページに置き換えるもの。質問内容は`lib/intake-questions.ts`が唯一の情報源。
+
+- 回答は`IntakeResponse`テーブルにそのまま保存され、送信者が既にLINE友だち紐づけ済み(`/line-friends`)であれば自動でその顧客に紐づく。未紐づけの場合は`/intake-responses`で一覧表示され、スタッフが新規顧客登録時に読み込むか、既存顧客に手動で紐づける
+- クライアント側が申告する`lineUserId`をそのまま信用すると他人の情報を騙れてしまうため、LIFFのIDトークンを`LIFF_CHANNEL_ID`を使ってLINE側のverifyエンドポイントで検証してから使用する(`lib/line.ts`の`verifyLiffIdToken`)
+
+### 初回のみ: LIFFアプリの作成(LINE Developersコンソール、ブラウザ操作)
+
+1. LINE Developersコンソールで、Webhookを設定済みの**同じMessaging APIチャネル**を開く
+2. 「LIFF」タブ →「追加」。エンドポイントURLに`https://<本番ドメイン>/intake`を設定し、Size は `Full` を推奨
+3. 作成後に発行される **LIFF ID** を`NEXT_PUBLIC_LIFF_ID`に、チャネル基本設定にある**チャネルID**(数字のみ)を`LIFF_CHANNEL_ID`としてVercelの環境変数に設定する
+4. 公式アカウントのリッチメニューやメッセージに、LIFFのURL(`https://liff.line.me/<LIFF ID>`)へのリンクを設置する
+
+`NEXT_PUBLIC_LIFF_ID`が未設定の間も`/intake`ページ自体は開けるが、LINEとの自動突合(lineUserIdの取得)ができないため、送信された回答はすべて`/intake-responses`で未紐づけ扱いになる(動作確認・移行期間用のフォールバック)。
 
 ## 集計ロジックの単体確認
 

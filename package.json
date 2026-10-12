@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
+    "@line/liff": "^2.31.2",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "7.10.0",
     "@supabase/supabase-js": "^2.117.2",

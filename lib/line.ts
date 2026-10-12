@@ -98,6 +98,29 @@ export async function sendLineTextMessage(lineUserId: string | null, text: strin
   return { ok: true };
 }
 
+/**
+ * LIFF(LINE Front-end Framework)の問診フォーム(app/intake)が送ってきたIDトークンを検証し、
+ * 本物のLINEユーザーかどうか・どのlineUserId(sub)かを確定させる。
+ * クライアントが申告したlineUserIdをそのまま信用すると、別人のuserIdを騙って他人の顧客情報に
+ * 問診回答を紐づけられてしまうため、必ずLINEのverifyエンドポイントでIDトークン自体を検証する。
+ * LIFF_CHANNEL_ID(LIFFアプリが属するチャネルのID)が未設定の場合は検証できないためnullを返す。
+ */
+export async function verifyLiffIdToken(idToken: string): Promise<{ userId: string } | null> {
+  const channelId = process.env.LIFF_CHANNEL_ID;
+  if (!channelId || !idToken) return null;
+
+  const res = await fetch("https://api.line.me/oauth2/v2.1/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ id_token: idToken, client_id: channelId }),
+  });
+  if (!res.ok) return null;
+
+  const body = (await res.json()) as { sub?: string; aud?: string };
+  if (!body.sub || body.aud !== channelId) return null;
+  return { userId: body.sub };
+}
+
 export function buildReservationReminderMessage(clientName: string, reservedAt: Date): string {
   const dateStr = `${reservedAt.getMonth() + 1}月${reservedAt.getDate()}日 ${reservedAt.getHours()}時${String(
     reservedAt.getMinutes()
