@@ -1,22 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { submitIntakeResponse } from "@/app/actions/intake";
 import { INTAKE_QUESTIONS, type IntakeQuestion } from "@/lib/intake-questions";
 
 const LIFF_ID = process.env.NEXT_PUBLIC_LIFF_ID;
 
-export function IntakeForm({ channels }: { channels: { id: string; name: string }[] }) {
+export function IntakeForm({ channels, isStaff = false }: { channels: { id: string; name: string }[]; isStaff?: boolean }) {
   const [idToken, setIdToken] = useState("");
-  // LIFF未設定(構築中・テスト時)の場合は最初からready扱いにする。その場合LINEとの自動突合はできない。
-  const [liffReady, setLiffReady] = useState(!LIFF_ID);
+  // LIFF未設定、またはスタッフが代筆している場合は最初からready扱いにする(スタッフ自身のLINEログインに
+  // リダイレクトされては困るため、スタッフ時はLIFF初期化自体を行わない)。その場合LINEとの自動突合はできない。
+  const [liffReady, setLiffReady] = useState(!LIFF_ID || isStaff);
   const [liffError, setLiffError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!LIFF_ID) return;
+    if (!LIFF_ID || isStaff) return;
     import("@line/liff").then(async ({ default: liff }) => {
       try {
         await liff.init({ liffId: LIFF_ID });
@@ -31,7 +33,7 @@ export function IntakeForm({ channels }: { channels: { id: string; name: string 
         setLiffReady(true);
       }
     });
-  }, []);
+  }, [isStaff]);
 
   async function handleSubmit(formData: FormData) {
     setSubmitting(true);
@@ -39,15 +41,23 @@ export function IntakeForm({ channels }: { channels: { id: string; name: string 
     formData.set("idToken", idToken);
     const result = await submitIntakeResponse(formData);
     setSubmitting(false);
-    if (result.ok) setSubmitted(true);
+    if (result.ok) setSubmittedId(result.id);
     else setError(result.error);
   }
 
-  if (submitted) {
+  if (submittedId) {
     return (
       <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center text-emerald-900">
         <p className="font-medium">問診票を送信しました。ご協力ありがとうございました。</p>
         <p className="mt-2 text-sm">ご来院時にスタッフが内容を確認いたします。</p>
+        {isStaff && (
+          <Link
+            href={`/clients/new?intakeResponseId=${submittedId}`}
+            className="mt-4 inline-block rounded-md bg-emerald-800 px-4 py-2 text-sm font-medium text-white"
+          >
+            この内容で新規顧客登録へ進む
+          </Link>
+        )}
       </div>
     );
   }

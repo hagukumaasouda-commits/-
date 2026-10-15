@@ -39,7 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     LINE友だち紐づけ
                   </Link>
                   <Link href="/intake-responses" className="hover:text-emerald-800">
-                    LINE事前問診
+                    事前問診
                   </Link>
                   <Link href="/followups" className="hover:text-emerald-800">
                     フォローアップ

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createClient } from "@/app/actions/clients";
 import { RANK_OPTIONS } from "@/lib/tags";
 import { IntakeAnswersView } from "@/app/intake-responses/intake-answers-view";
+import { CounselingScript } from "./counseling-script";
 
 export default async function NewClientPage({ searchParams }: { searchParams: Promise<{ intakeResponseId?: string }> }) {
   const { intakeResponseId } = await searchParams;
@@ -28,7 +29,7 @@ export default async function NewClientPage({ searchParams }: { searchParams: Pr
       <h1 className="text-xl font-semibold text-stone-900 mb-2">新規顧客登録</h1>
       {intake && (
         <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-          LINE事前問診の回答({intake.name})を読み込みました。内容を確認のうえ登録してください。
+          事前問診の回答({intake.name})を読み込みました。内容を確認のうえ登録してください。
         </p>
       )}
       {intakeResponseId && !intake && (
@@ -39,7 +40,7 @@ export default async function NewClientPage({ searchParams }: { searchParams: Pr
       {!intake && (
         <p className="mb-4 text-xs text-stone-400">
           <Link href="/intake-responses" className="underline">
-            LINE事前問診の回答から登録する場合はこちら
+            事前問診の回答から登録する場合はこちら
           </Link>
         </p>
       )}
@@ -192,6 +193,9 @@ export default async function NewClientPage({ searchParams }: { searchParams: Pr
             ))}
           </select>
         </Field>
+
+        <CounselingScript />
+
         <Field label="個人データ">
           <textarea name="personalData" rows={3} className="input" />
         </Field>
@@ -207,7 +211,7 @@ export default async function NewClientPage({ searchParams }: { searchParams: Pr
 
         {intake && (
           <details className="rounded-md border border-stone-200 bg-stone-50 p-3">
-            <summary className="cursor-pointer text-sm text-stone-600">LINE事前問診の回答(全文)を見る</summary>
+            <summary className="cursor-pointer text-sm text-stone-600">事前問診の回答(全文)を見る</summary>
             <div className="mt-2">
               <IntakeAnswersView answers={answers} />
             </div>

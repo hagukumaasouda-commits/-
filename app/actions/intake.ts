@@ -6,13 +6,17 @@ import { auth } from "@/auth";
 import { verifyLiffIdToken } from "@/lib/line";
 import { INTAKE_QUESTIONS } from "@/lib/intake-questions";
 
-export type SubmitIntakeResult = { ok: true } | { ok: false; error: string };
+export type SubmitIntakeResult = { ok: true; id: string } | { ok: false; error: string };
 
 /**
  * LIFF問診フォーム(app/intake)からの送信を受ける。ログイン不要(患者自身がLINEから送信するため)。
  * idTokenが付いている場合はLINE側で検証し、既にLineFriendとして紐づけ済みのlineUserIdであれば
  * 作成と同時にそのClientへ自動で紐づける(患者側の追加操作は不要)。未紐づけの場合は
  * スタッフが来院時(新規顧客登録 or /intake-responses)に手動で紐づける。
+ *
+ * LINEを持たない患者の分は、スタッフが同じ/intakeページをログイン状態で開いて代筆する
+ * (idTokenが付かないため、lineUserId=nullの未紐づけ回答として作成される。/clients/new
+ * へそのまま進めるよう、作成したIDを返す)。
  */
 export async function submitIntakeResponse(formData: FormData): Promise<SubmitIntakeResult> {
   const name = String(formData.get("name") || "").trim();
@@ -44,7 +48,7 @@ export async function submitIntakeResponse(formData: FormData): Promise<SubmitIn
     ? await prisma.lineFriend.findUnique({ where: { lineUserId }, select: { linkedClientId: true } })
     : null;
 
-  await prisma.intakeResponse.create({
+  const created = await prisma.intakeResponse.create({
     data: {
       lineUserId,
       name,
@@ -59,7 +63,7 @@ export async function submitIntakeResponse(formData: FormData): Promise<SubmitIn
   if (linkedClient?.linkedClientId) revalidatePath(`/clients/${linkedClient.linkedClientId}`);
   revalidatePath("/intake-responses");
 
-  return { ok: true };
+  return { ok: true, id: created.id };
 }
 
 /** スタッフが未紐づけの問診回答を既存顧客に手動で紐づける(/intake-responses)。LINE友だち紐づけと同じclientQuery方式。 */

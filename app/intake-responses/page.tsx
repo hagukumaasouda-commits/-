@@ -22,10 +22,13 @@ export default async function IntakeResponsesPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-xl font-semibold text-stone-900">LINE事前問診の回答</h1>
+        <h1 className="text-xl font-semibold text-stone-900">事前問診の回答</h1>
         <p className="text-sm text-stone-500 mt-1">
           LINEから送信された事前問診の回答一覧です。すでにLINE友だち紐づけ済みの方は自動で顧客に紐づきます。未紐づけの方は、新規顧客登録時に読み込むか、ここで既存顧客に手動で紐づけてください。
         </p>
+        <Link href="/intake" className="mt-2 inline-block text-sm text-emerald-800 underline">
+          LINEをお持ちでない方の問診内容をスタッフが代わりに入力する
+        </Link>
       </div>
 
       <section className="rounded-lg border border-stone-200 bg-white p-5">

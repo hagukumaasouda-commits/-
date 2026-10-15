@@ -685,7 +685,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
       {client.intakeResponse && (
         <section className="rounded-lg border border-stone-200 bg-white p-5">
-          <h2 className="font-semibold mb-1">LINE事前問診の回答</h2>
+          <h2 className="font-semibold mb-1">事前問診の回答</h2>
           <p className="text-xs text-stone-500 mb-3">
             送信: {client.intakeResponse.submittedAt.toISOString().slice(0, 10)}
           </p>
