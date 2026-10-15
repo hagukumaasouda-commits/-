@@ -42,7 +42,7 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
    | `LINE_CHANNEL_ACCESS_TOKEN` | LINE公式アカウントのチャネルアクセストークン |
    | `LINE_CHANNEL_SECRET` | LINE Webhookの署名検証用チャネルシークレット(トークンとは別の値) |
    | `NEXT_PUBLIC_LIFF_ID` | LINE事前問診フォーム(`/intake`)用のLIFF ID。下記「LINE事前問診」節のLIFFアプリ作成後に設定 |
-   | `LIFF_CHANNEL_ID` | 同上。チャネルID(数字のみ)。IDトークンのサーバー側検証に使用 |
+   | `LIFF_CHANNEL_ID` | 同上。LIFFアプリを作成した**LINEログインチャネル自身**のチャネルID(数字のみ。Messaging APIチャネルのIDではない)。IDトークンのサーバー側検証に使用 |
    | `SUPABASE_URL` | 手順1-2で確認したSupabaseプロジェクトURL |
    | `SUPABASE_SERVICE_ROLE_KEY` | 手順1-2で確認した`service_role`キー(写真記録のStorageアクセス用) |
    | `APP_TZ` | `Asia/Tokyo`(来店日時のタイムゾーンを正しく扱うために必須。Vercelでは変数名 `TZ` が予約済みのため `APP_TZ` という名前で受け取り、`instrumentation.ts` が起動時に反映します) |
@@ -120,7 +120,7 @@ cp .env.example .env
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINEリマインド送信・友だち一覧取得用 | 未設定だとリマインド送信・遡及登録が失敗します(理由をUIに表示) |
 | `LINE_CHANNEL_SECRET` | `/api/line/webhook` の署名検証用 | 未設定だとWebhookは全リクエストを401で拒否します |
 | `NEXT_PUBLIC_LIFF_ID` | LINE事前問診フォーム(`/intake`)のLIFF ID | 未設定でも`/intake`自体は開けますが、LINEとの自動突合ができず全件が未紐づけ扱いになります |
-| `LIFF_CHANNEL_ID` | LIFFのIDトークンをサーバー側で検証する際のチャネルID | 未設定だとIDトークン検証が失敗し、lineUserIdが取得できません(自動突合ができなくなる点は上記と同じ) |
+| `LIFF_CHANNEL_ID` | LIFFのIDトークンをサーバー側で検証する際のチャネルID(LIFFを作成したLINEログインチャネル自身のID。Messaging APIチャネルのIDではない) | 未設定・誤設定だとIDトークン検証が失敗し、lineUserIdが取得できません(自動突合ができなくなる点は上記と同じ) |
 | `SUPABASE_URL` | 姿勢写真・インボディ結果の画像を保存するSupabase StorageのプロジェクトURL | 未設定だと写真の登録・表示・削除がすべて失敗します |
 | `SUPABASE_SERVICE_ROLE_KEY` | 同Storageへのアクセスキー(`anon`キーではなく`service_role`キー) | 同上 |
 
@@ -213,12 +213,14 @@ npm run dev
 
 ### 初回のみ: LIFFアプリの作成(LINE Developersコンソール、ブラウザ操作)
 
-1. LINE Developersコンソールで、Webhookを設定済みの**同じMessaging APIチャネル**を開く
-2. 「LIFF」タブ →「追加」。エンドポイントURLに`https://<本番ドメイン>/intake`を設定し、Size は `Full` を推奨
-3. 作成後に発行される **LIFF ID** を`NEXT_PUBLIC_LIFF_ID`に、チャネル基本設定にある**チャネルID**(数字のみ)を`LIFF_CHANNEL_ID`としてVercelの環境変数に設定する
+LINEの仕様変更により、既存のMessaging APIチャネルに直接LIFFを追加することができなくなっている。そのため、**LIFF専用の新規LINEログインチャネルを作成**し、そちらにLIFFアプリを追加する。
+
+1. LINE Developersコンソールで、Webhookを設定済みのMessaging APIチャネルと**同じプロバイダー配下**に、新規の「LINEログイン」チャネルを作成する(**別プロバイダーで作成すると、LINEのユーザーIDがMessaging APIチャネル側と一致せず、後述の自動突合が機能しなくなるので注意**)
+2. 作成したLINEログインチャネルの「LIFF」タブ →「追加」。エンドポイントURLに`https://<本番ドメイン>/intake`を設定し、Size は `Full` を推奨
+3. 発行される **LIFF ID** を`NEXT_PUBLIC_LIFF_ID`に、**このLINEログインチャネル自身のチャネルID**(数字のみ。Messaging APIチャネルのIDではない)を`LIFF_CHANNEL_ID`としてVercelの環境変数に設定する
 4. 公式アカウントのリッチメニューやメッセージに、LIFFのURL(`https://liff.line.me/<LIFF ID>`)へのリンクを設置する
 
-`NEXT_PUBLIC_LIFF_ID`が未設定の間も`/intake`ページ自体は開けるが、LINEとの自動突合(lineUserIdの取得)ができないため、送信された回答はすべて`/intake-responses`で未紐づけ扱いになる(動作確認・移行期間用のフォールバック)。
+`NEXT_PUBLIC_LIFF_ID`が未設定の間も`/intake`ページ自体は開けるが、LINEとの自動突合(lineUserIdの取得)ができないため、送信された回答はすべて`/intake-responses`で未紐づけ扱いになる(動作確認・移行期間用のフォールバック)。同じプロバイダー配下で作成していても、LINEのユーザーIDが一致しない設定ミスがあると、見た目上は同じ(全件未紐づけになるだけでエラーは出ない)になるため区別がつきにくい点に注意。
 
 ## 集計ロジックの単体確認
 

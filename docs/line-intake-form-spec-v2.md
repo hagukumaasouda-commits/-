@@ -10,6 +10,7 @@
 - `IntakeResponse`テーブル: 1回答=1行。氏名・フリガナ・電話番号は一覧表示・突合用に複製して持つが、本体は`answers`(Json、質問keyごとの回答)にそのまま保存する
 - `app/intake`(`/intake`): 患者がLINEから開く公開ページ(ログイン不要。`proxy.ts`で認証対象から除外)。`@line/liff`でLIFF初期化し、ログイン済みならIDトークンを取得してフォームに添える
 - `app/actions/intake.ts`の`submitIntakeResponse`: IDトークンをLINE側のverifyエンドポイントで検証(`lib/line.ts`の`verifyLiffIdToken`、`LIFF_CHANNEL_ID`で`aud`を照合)し、本物の`lineUserId`を確定させてから保存する。クライアントが申告したuserIdをそのまま信用すると、他人のuserIdを騙って別人の顧客情報に回答を紐づけられてしまうため、必ずサーバー側で検証する
+- **LIFFの作成先について**: LINEの仕様変更により、既存のMessaging APIチャネルに直接LIFFを追加することができなくなったため、同じプロバイダー配下に新規の「LINEログインチャネル」を作成し、そちらにLIFFアプリを追加する運用にしている。`LIFF_CHANNEL_ID`は、このLINEログインチャネル自身のチャネルID(Messaging APIチャネルのIDではない)。LINEのユーザーID(`sub`)は同一プロバイダー内の全チャネルで共通のため、同じプロバイダー配下に作っている限り`verifyLiffIdToken`が返す`lineUserId`は、Webhookで記録している`LineFriend.lineUserId`とそのまま一致し、突合処理に影響はない(**別プロバイダーで作成した場合はユーザーIDが一致せず、自動突合だけが静かに機能しなくなる**ため要注意)
 - 突合: 送信時点でその`lineUserId`が既に`LineFriend.linkedClientId`で顧客に紐づいている場合は、作成と同時に自動でその顧客へ紐づける。未紐づけの場合は`/intake-responses`(スタッフ向け、ナビに追加)で一覧表示され、新規顧客登録時に読み込む(`/clients/new?intakeResponseId=...`で該当項目をプリフィルし、登録と同時に紐づける)か、既存顧客に手動で紐づけられる
 
 ## フィールドのマッピング方針
@@ -25,7 +26,7 @@
 
 ## 本番セットアップ(README「LINE事前問診」節参照)
 
-1. LINE Developersコンソールの既存Messaging APIチャネルに「LIFF」タブからLIFFアプリを追加(エンドポイントURL `https://<本番ドメイン>/intake`)
-2. 発行された LIFF ID を`NEXT_PUBLIC_LIFF_ID`、チャネルIDを`LIFF_CHANNEL_ID`としてVercel環境変数に設定
+1. Messaging APIチャネルと同じプロバイダー配下に、LIFF専用の新規LINEログインチャネルを作成し、その「LIFF」タブからLIFFアプリを追加(エンドポイントURL `https://<本番ドメイン>/intake`)
+2. 発行された LIFF ID を`NEXT_PUBLIC_LIFF_ID`、**このLINEログインチャネル自身の**チャネルIDを`LIFF_CHANNEL_ID`としてVercel環境変数に設定
 3. `npx tsx prisma/seed-production.ts`を再実行し、追加した3件の来店きっかけマスタを本番に投入する(upsertのため安全に再実行可能)
 4. リッチメニュー等にLIFFのURL(`https://liff.line.me/<LIFF ID>`)を設置する
