@@ -21,7 +21,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   const prepaidBalance = client.prepaidCard
     ? (
         await prisma.prepaidTransaction.aggregate({
-          where: { cardId: client.prepaidCard.id },
+          where: { cardId: client.prepaidCard.id, voidedAt: null },
           _sum: { amount: true },
         })
       )._sum.amount ?? 0

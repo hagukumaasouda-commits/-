@@ -713,7 +713,7 @@ export async function getPrepaidDrainWithoutVisit(period: ReportPeriod) {
     where: { clientId: { in: churnedIds } },
     include: {
       client: { select: { id: true, name: true } },
-      transactions: { select: { amount: true } },
+      transactions: { where: { voidedAt: null }, select: { amount: true } },
     },
   });
 

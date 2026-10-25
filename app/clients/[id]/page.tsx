@@ -7,6 +7,7 @@ import { AwarenessCheckButton } from "./awareness-check-button";
 import { confirmDeparture, recordFollowupContact, updateDepartureRecord } from "@/app/actions/departures";
 import { requestReassignment, resolveReassignment } from "@/app/actions/reassignments";
 import { recordPrepaidTransaction } from "@/app/actions/prepaid";
+import { VoidPrepaidTransactionForm } from "./void-prepaid-transaction-form";
 import { recordProductSale } from "@/app/actions/products";
 import { setNextAppointment, cancelNextAppointment } from "@/app/actions/appointments";
 import { getClientPurchaseHistory } from "@/lib/product-reports";
@@ -78,7 +79,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       referralSourceClient: { select: { id: true, name: true } },
       referralSourceStaff: { select: { id: true, name: true } },
       referrals: { select: { id: true, name: true } },
-      prepaidCard: { include: { transactions: { orderBy: { txDate: "desc" }, take: 10, include: { staff: true } } } },
+      prepaidCard: {
+        include: { transactions: { orderBy: { txDate: "desc" }, take: 10, include: { staff: true, voidedBy: { select: { name: true } } } } },
+      },
       treatmentCourses: { orderBy: { courseNo: "desc" } },
       reservations: { orderBy: { reservedAt: "desc" }, take: 5 },
       visits: {
@@ -110,7 +113,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const balance = client.prepaidCard
     ? (
         await prisma.prepaidTransaction.aggregate({
-          where: { cardId: client.prepaidCard.id },
+          where: { cardId: client.prepaidCard.id, voidedAt: null },
           _sum: { amount: true },
         })
       )._sum.amount ?? 0
@@ -288,15 +291,30 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               <div className="text-xs text-stone-500 mb-3">プラン: {client.prepaidCard.planType ?? "—"}</div>
               <ul className="flex flex-col gap-1 text-sm">
                 {client.prepaidCard.transactions.map((t) => (
-                  <li key={t.id} className="flex flex-col text-stone-600">
+                  <li key={t.id} className={`flex flex-col ${t.voidedAt ? "text-stone-400" : "text-stone-600"}`}>
                     <div className="flex justify-between">
-                      <span>
+                      <span className={t.voidedAt ? "line-through" : ""}>
                         {fmtDate(t.txDate)} {t.txType === "CHARGE" ? "入金" : t.txType === "USE" ? "使用" : "訂正"}
                         {t.staff && <span className="text-xs text-stone-400"> ・ {t.staff.name}</span>}
                       </span>
-                      <span className="tabular-nums">{t.amount > 0 ? "+" : ""}{t.amount.toLocaleString()}円</span>
+                      <span className={`tabular-nums ${t.voidedAt ? "line-through" : ""}`}>
+                        {t.amount > 0 ? "+" : ""}
+                        {t.amount.toLocaleString()}円
+                      </span>
                     </div>
-                    {t.note && <span className="text-xs text-stone-400">{t.note}</span>}
+                    {t.note && <span className={`text-xs text-stone-400 ${t.voidedAt ? "line-through" : ""}`}>{t.note}</span>}
+
+                    {t.voidedAt ? (
+                      <span className="text-xs text-rose-600">
+                        取消済み({fmtDate(t.voidedAt)} ・ {t.voidedBy?.name ?? "—"}
+                        {t.voidReason && ` ・ ${t.voidReason}`})
+                      </span>
+                    ) : (
+                      <VoidPrepaidTransactionForm
+                        transactionId={t.id}
+                        confirmLabel={`${fmtDate(t.txDate)} ${t.amount > 0 ? "+" : ""}${t.amount.toLocaleString()}円`}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>

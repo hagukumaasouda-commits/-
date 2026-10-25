@@ -116,7 +116,7 @@ async function buildClientContext(clientId: string) {
 
   const card = await prisma.prepaidCard.findUnique({
     where: { clientId },
-    include: { transactions: { orderBy: { txDate: "desc" }, take: 10 } },
+    include: { transactions: { where: { voidedAt: null }, orderBy: { txDate: "desc" }, take: 10 } },
   });
   const balance = card ? card.transactions.reduce((sum, t) => sum + t.amount, 0) : null;
   const lastUseDate = card?.transactions.find((t) => t.amount < 0)?.txDate ?? null;

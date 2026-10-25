@@ -34,14 +34,15 @@ model Staff {
   productStockIns     ProductStockIn[]
   prepaidTransactions PrepaidTransaction[]
 
-  departuresConfirmed     DepartureRecord[]     @relation("DepartureConfirmedBy")
-  followupsContacted      FollowupCheckpoint[]  @relation("FollowupContactedBy")
-  reassignmentsAsCurrent  ReassignmentRequest[] @relation("ReassignmentCurrentStaff")
-  reassignmentsRequested  ReassignmentRequest[] @relation("ReassignmentRequestedBy")
-  reassignmentsAsNewStaff ReassignmentRequest[] @relation("ReassignmentNewStaff")
-  lineFriendsLinked       LineFriend[]          @relation("LineFriendLinkedBy")
-  clientPhotosUploaded    ClientPhoto[]
-  intakeResponsesLinked   IntakeResponse[]      @relation("IntakeResponseLinkedBy")
+  departuresConfirmed       DepartureRecord[]     @relation("DepartureConfirmedBy")
+  followupsContacted        FollowupCheckpoint[]  @relation("FollowupContactedBy")
+  reassignmentsAsCurrent    ReassignmentRequest[] @relation("ReassignmentCurrentStaff")
+  reassignmentsRequested    ReassignmentRequest[] @relation("ReassignmentRequestedBy")
+  reassignmentsAsNewStaff   ReassignmentRequest[] @relation("ReassignmentNewStaff")
+  lineFriendsLinked         LineFriend[]          @relation("LineFriendLinkedBy")
+  clientPhotosUploaded      ClientPhoto[]
+  intakeResponsesLinked     IntakeResponse[]      @relation("IntakeResponseLinkedBy")
+  prepaidTransactionsVoided PrepaidTransaction[]  @relation("PrepaidTransactionVoidedBy")
 }
 
 enum StaffRole {
@@ -345,6 +346,14 @@ model PrepaidTransaction {
   staff   Staff?  @relation(fields: [staffId], references: [id])
 
   note String?
+
+  // 取消(論理削除)。誤入力の訂正を+-の相殺記帳ではなく取消で行えるようにする
+  // (docs/prepaid-transaction-void-spec-v2.md)。物理削除はせず、残高集計・明細から除外しつつ
+  // 行自体は履歴として残す。
+  voidedAt        DateTime?
+  voidedByStaffId String?
+  voidedBy        Staff?    @relation("PrepaidTransactionVoidedBy", fields: [voidedByStaffId], references: [id])
+  voidReason      String?
 
   @@index([cardId, txDate])
 }

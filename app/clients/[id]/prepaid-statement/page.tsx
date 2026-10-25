@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PrintButton } from "./print-button";
 
-function fmtDate(d: Date) {
-  return d.toISOString().slice(0, 10);
+function fmtDate(d: Date | null) {
+  return d ? d.toISOString().slice(0, 10) : "—";
 }
 
 const txTypeLabel: Record<string, string> = {
@@ -44,15 +44,28 @@ export default async function PrepaidStatementPage({
     ? await prisma.prepaidTransaction.findMany({
         where: { cardId: client.prepaidCard.id },
         orderBy: { txDate: "asc" },
-        include: { staff: { select: { name: true } } },
+        include: { staff: { select: { name: true } }, voidedBy: { select: { name: true } } },
       })
     : [];
 
   let running = 0;
   let openingBalance = 0;
-  const rows: { id: string; txDate: Date; txType: string; amount: number; note: string | null; staffName: string | null; runningBalance: number }[] = [];
+  const rows: {
+    id: string;
+    txDate: Date;
+    txType: string;
+    amount: number;
+    note: string | null;
+    staffName: string | null;
+    runningBalance: number;
+    voided: boolean;
+    voidedAt: Date | null;
+    voidedByName: string | null;
+    voidReason: string | null;
+  }[] = [];
   for (const t of allTx) {
-    running += t.amount;
+    const voided = !!t.voidedAt;
+    if (!voided) running += t.amount; // 取消済みは残高に影響させない(行自体は明細に残す)
     if (fromDate && t.txDate < fromDate) {
       openingBalance = running;
       continue;
@@ -66,11 +79,16 @@ export default async function PrepaidStatementPage({
       note: t.note,
       staffName: t.staff?.name ?? null,
       runningBalance: running,
+      voided,
+      voidedAt: t.voidedAt,
+      voidedByName: t.voidedBy?.name ?? null,
+      voidReason: t.voidReason,
     });
   }
   const closingBalance = rows.length > 0 ? rows[rows.length - 1].runningBalance : openingBalance;
-  const totalCharge = rows.filter((r) => r.amount > 0).reduce((sum, r) => sum + r.amount, 0);
-  const totalUse = rows.filter((r) => r.amount < 0).reduce((sum, r) => sum + r.amount, 0);
+  const liveRows = rows.filter((r) => !r.voided);
+  const totalCharge = liveRows.filter((r) => r.amount > 0).reduce((sum, r) => sum + r.amount, 0);
+  const totalUse = liveRows.filter((r) => r.amount < 0).reduce((sum, r) => sum + r.amount, 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -159,16 +177,20 @@ export default async function PrepaidStatementPage({
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-stone-100 last:border-0">
-                    <td className="py-1.5 pr-4 whitespace-nowrap">{fmtDate(r.txDate)}</td>
-                    <td className="py-1.5 pr-4">{txTypeLabel[r.txType] ?? r.txType}</td>
-                    <td className="py-1.5 pr-4 text-right tabular-nums">
+                  <tr key={r.id} className={`border-b border-stone-100 last:border-0 ${r.voided ? "text-stone-400" : ""}`}>
+                    <td className={`py-1.5 pr-4 whitespace-nowrap ${r.voided ? "line-through" : ""}`}>{fmtDate(r.txDate)}</td>
+                    <td className={`py-1.5 pr-4 ${r.voided ? "line-through" : ""}`}>{txTypeLabel[r.txType] ?? r.txType}</td>
+                    <td className={`py-1.5 pr-4 text-right tabular-nums ${r.voided ? "line-through" : ""}`}>
                       {r.amount > 0 ? "+" : ""}
                       {r.amount.toLocaleString()}円
                     </td>
-                    <td className="py-1.5 pr-4 text-right tabular-nums">{r.runningBalance.toLocaleString()}円</td>
+                    <td className="py-1.5 pr-4 text-right tabular-nums">{r.voided ? "—" : `${r.runningBalance.toLocaleString()}円`}</td>
                     <td className="py-1.5 pr-4">{r.staffName ?? "—"}</td>
-                    <td className="py-1.5 text-stone-500">{r.note ?? ""}</td>
+                    <td className="py-1.5 text-stone-500">
+                      {r.voided
+                        ? `取消済み(${fmtDate(r.voidedAt)} ・ ${r.voidedByName ?? "—"}${r.voidReason ? ` ・ ${r.voidReason}` : ""})`
+                        : (r.note ?? "")}
+                    </td>
                   </tr>
                 ))}
                 {rows.length === 0 && (
