@@ -13,17 +13,26 @@ function getSupabaseClient() {
   return createClient(url, key);
 }
 
-export async function uploadClientPhoto(clientId: string, file: File): Promise<string> {
+/**
+ * 画像本体をVercelのサーバー関数(Server Actions)経由で送ると、Vercel側のリクエストボディ上限
+ * (約4.5MB。next.config.tsのbodySizeLimit設定では変更できない)に引っかかり、スマホカメラの
+ * 写真(数MB〜十数MB)がアップロードできない問題があった(docs/client-photos-upload-fix-v2.md)。
+ * そのため、画像本体はブラウザからSupabase Storageへ直接アップロードする方式に変更し、
+ * サーバー側ではこの「署名付きアップロードURL」の発行だけを行う(service_role鍵が必要なため
+ * 発行自体はサーバー側でしか行えない)。
+ */
+export async function createClientPhotoUploadTicket(
+  clientId: string,
+  fileName: string
+): Promise<{ path: string; token: string }> {
   const supabase = getSupabaseClient();
-  const ext = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
+  const ext = fileName.includes(".") ? fileName.split(".").pop() : "jpg";
   const path = `${clientId}/${crypto.randomUUID()}.${ext}`;
 
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-    contentType: file.type || "application/octet-stream",
-  });
-  if (error) throw new Error(`画像のアップロードに失敗しました: ${error.message}`);
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path);
+  if (error || !data) throw new Error(`アップロード準備に失敗しました: ${error?.message ?? "unknown error"}`);
 
-  return path;
+  return { path, token: data.token };
 }
 
 export async function getClientPhotoSignedUrl(storagePath: string): Promise<string | null> {

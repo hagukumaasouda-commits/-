@@ -26,6 +26,7 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
 1. Supabaseダッシュボードの「Storage」から新規バケットを作成。バケット名は `client-photos`
 2. **「Public bucket」は必ずオフのまま**(非公開バケット。画像はアプリがサーバー側で発行する署名付きURL経由でのみ配信します)
 3. 「Project Settings → API」から `Project URL` と `service_role` キー(`anon`キーではない点に注意。Storageへのフルアクセス権限を持つ秘密の値)を取得し、それぞれ `SUPABASE_URL`・`SUPABASE_SERVICE_ROLE_KEY` として後述のVercel環境変数に設定する
+4. 同じ画面の `anon` `public` キーも取得し、`Project URL`とあわせて `NEXT_PUBLIC_SUPABASE_URL`・`NEXT_PUBLIC_SUPABASE_ANON_KEY` として設定する(写真の**アップロード**はVercelのサーバー関数のボディサイズ上限・約4.5MBを避けるため、ブラウザからSupabase Storageへ直接行う方式にしている。`anon`キーは公開して問題ない値で、`service_role`キーとは別物)
 
 ### 2. Vercel(アプリ本体)
 
@@ -45,6 +46,8 @@ Next.js (App Router) + Prisma + PostgreSQL + Anthropic API(気づきチェック
    | `LIFF_CHANNEL_ID` | 同上。LIFFアプリを作成した**LINEログインチャネル自身**のチャネルID(数字のみ。Messaging APIチャネルのIDではない)。IDトークンのサーバー側検証に使用 |
    | `SUPABASE_URL` | 手順1-2で確認したSupabaseプロジェクトURL |
    | `SUPABASE_SERVICE_ROLE_KEY` | 手順1-2で確認した`service_role`キー(写真記録のStorageアクセス用) |
+   | `NEXT_PUBLIC_SUPABASE_URL` | 手順1-2と同じSupabaseプロジェクトURL(ブラウザから直接アップロードするため) |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 手順1-2で確認した`anon` `public`キー |
    | `APP_TZ` | `Asia/Tokyo`(来店日時のタイムゾーンを正しく扱うために必須。Vercelでは変数名 `TZ` が予約済みのため `APP_TZ` という名前で受け取り、`instrumentation.ts` が起動時に反映します) |
 
 5. 「Deploy」をクリック
@@ -121,8 +124,10 @@ cp .env.example .env
 | `LINE_CHANNEL_SECRET` | `/api/line/webhook` の署名検証用 | 未設定だとWebhookは全リクエストを401で拒否します |
 | `NEXT_PUBLIC_LIFF_ID` | LINE事前問診フォーム(`/intake`)のLIFF ID | 未設定でも`/intake`自体は開けますが、LINEとの自動突合ができず全件が未紐づけ扱いになります |
 | `LIFF_CHANNEL_ID` | LIFFのIDトークンをサーバー側で検証する際のチャネルID(LIFFを作成したLINEログインチャネル自身のID。Messaging APIチャネルのIDではない) | 未設定・誤設定だとIDトークン検証が失敗し、lineUserIdが取得できません(自動突合ができなくなる点は上記と同じ) |
-| `SUPABASE_URL` | 姿勢写真・インボディ結果の画像を保存するSupabase StorageのプロジェクトURL | 未設定だと写真の登録・表示・削除がすべて失敗します |
-| `SUPABASE_SERVICE_ROLE_KEY` | 同Storageへのアクセスキー(`anon`キーではなく`service_role`キー) | 同上 |
+| `SUPABASE_URL` | 姿勢写真・インボディ結果の画像を保存するSupabase StorageのプロジェクトURL | 未設定だと写真の表示・削除が失敗します |
+| `SUPABASE_SERVICE_ROLE_KEY` | 同Storageへのアクセスキー(`anon`キーではなく`service_role`キー) | 同上(アップロード用の署名付きURL発行も失敗します) |
+| `NEXT_PUBLIC_SUPABASE_URL` | ブラウザから直接アップロードするための、同Supabaseプロジェクトの公開URL | 未設定だと写真のアップロードが失敗します |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 同アップロード用の`anon`公開キー | 同上 |
 
 ### 4. マイグレーション・シード投入
 
