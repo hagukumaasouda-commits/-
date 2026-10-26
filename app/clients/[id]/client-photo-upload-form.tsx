@@ -91,7 +91,7 @@ export function ClientPhotoUploadForm({ clientId }: { clientId: string }) {
         <span className="text-stone-600">
           画像<span className="text-rose-600"> *</span>
         </span>
-        <input type="file" name="file" accept="image/*" capture="environment" required className="text-sm" />
+        <input type="file" name="file" accept="image/*" required className="text-sm" />
       </label>
       <button
         type="submit"
